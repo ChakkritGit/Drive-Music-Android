@@ -1,0 +1,134 @@
+package com.drivemusic.android.audio
+
+import androidx.media3.common.C
+import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.BaseAudioProcessor
+import androidx.media3.common.util.UnstableApi
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.math.roundToInt
+
+/**
+ * One slot's filter chain, inserted into that player's own audio pipeline.
+ *
+ * This is the answer to "Android has no `AVAudioEngine`". Media3 lets each player carry its own
+ * chain of [AudioProcessor]s, which is exactly the per-slot hook the transition needs — the
+ * session-wide `audiofx` effects cannot express it, because a transition's whole substance is
+ * doing different things to two tracks at the same moment.
+ *
+ * Order matters and mirrors the iOS node graph: high-pass, then low-pass, then the bass shelf,
+ * then gain. Filtering before gain means the ramp is applied to already-filtered audio, so a lane
+ * that closes a filter to nothing does not also have to fight the volume lane.
+ *
+ * [parameters] is written from the playback thread and read on the audio thread every buffer. It
+ * is a single immutable value for the same reason [Biquad.coefficients] is: reading a
+ * half-updated parameter set produces a filter that is briefly nonsense, and "briefly nonsense"
+ * in a feedback path can mean a sustained blast.
+ */
+@UnstableApi
+class TransitionAudioProcessor : BaseAudioProcessor() {
+
+    @Volatile
+    var parameters: SlotParameters = SlotParameters.open
+        set(value) {
+            field = value
+            updateCoefficients(value)
+        }
+
+    private var channelCount = 0
+    private var sampleRate = 0
+
+    // One filter per channel — biquad state is per-signal, and sharing one across a stereo pair
+    // would feed each channel the other's history, which reads as a hollow, phasey smear.
+    private var highPass: Array<Biquad> = emptyArray()
+    private var lowPass: Array<Biquad> = emptyArray()
+    private var bass: Array<Biquad> = emptyArray()
+
+    override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+        // 16-bit PCM only. Media3 hands float buffers through when float output is enabled, and
+        // silently misreading those as shorts would be loud noise rather than a quiet bug, so this
+        // declines the format instead and Media3 arranges a conversion.
+        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
+            throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
+        }
+        channelCount = inputAudioFormat.channelCount
+        sampleRate = inputAudioFormat.sampleRate
+        highPass = Array(channelCount) { Biquad() }
+        lowPass = Array(channelCount) { Biquad() }
+        bass = Array(channelCount) { Biquad() }
+        updateCoefficients(parameters)
+        return inputAudioFormat
+    }
+
+    /**
+     * Always active. Returning false when the chain happens to be flat would let Media3 drop this
+     * processor out of the pipeline entirely, and then a transition starting a moment later would
+     * have nowhere to apply itself.
+     */
+    override fun isActive(): Boolean = channelCount > 0
+
+    private fun updateCoefficients(value: SlotParameters) {
+        if (sampleRate <= 0) return
+        val rate = sampleRate.toDouble()
+        val hp = Biquad.highPass(value.highPassHz, rate)
+        val lp = Biquad.lowPass(value.lowPassHz, rate)
+        // 250Hz corner: high enough to take the weight out of a track, low enough to leave the
+        // vocal and snare body alone, which is what makes a swap sound like a handover instead of
+        // a filter sweep.
+        val shelf = Biquad.lowShelf(BASS_SHELF_HZ, value.bassDb, rate)
+        for (channel in 0 until channelCount) {
+            highPass[channel].coefficients = hp
+            lowPass[channel].coefficients = lp
+            bass[channel].coefficients = shelf
+        }
+    }
+
+    override fun queueInput(inputBuffer: ByteBuffer) {
+        val frames = inputBuffer.remaining() / (2 * channelCount)
+        val output = replaceOutputBuffer(frames * 2 * channelCount)
+        val input = inputBuffer.order(ByteOrder.nativeOrder()).asShortBuffer()
+        val volume = parameters.volume
+
+        for (frame in 0 until frames) {
+            for (channel in 0 until channelCount) {
+                var sample = input.get().toDouble() / SHORT_SCALE
+                sample = highPass[channel].process(sample)
+                sample = lowPass[channel].process(sample)
+                sample = bass[channel].process(sample)
+                sample *= volume
+                // Clipped, not wrapped. A shelf boost or a resonant corner can push a sample past
+                // full scale, and letting a Short overflow turns a moment of loudness into a burst
+                // of noise at the opposite polarity.
+                val scaled = (sample * SHORT_SCALE).roundToInt().coerceIn(MIN_SHORT, MAX_SHORT)
+                output.putShort(scaled.toShort())
+            }
+        }
+        inputBuffer.position(inputBuffer.limit())
+        output.flip()
+    }
+
+    override fun onFlush() {
+        resetFilterState()
+    }
+
+    override fun onReset() {
+        resetFilterState()
+        channelCount = 0
+        sampleRate = 0
+    }
+
+    private fun resetFilterState() {
+        // Stale history across a seek is a transient at the new position — the filters are fed a
+        // discontinuity and ring on it.
+        highPass.forEach { it.reset() }
+        lowPass.forEach { it.reset() }
+        bass.forEach { it.reset() }
+    }
+
+    companion object {
+        const val BASS_SHELF_HZ = 250.0
+        private const val SHORT_SCALE = 32768.0
+        private const val MIN_SHORT = -32768
+        private const val MAX_SHORT = 32767
+    }
+}

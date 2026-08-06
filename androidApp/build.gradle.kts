@@ -34,10 +34,18 @@ android {
             isMinifyEnabled = false
         }
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
     implementation(project(":shared"))
+
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.common)
+    implementation(libs.media3.session)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -46,4 +54,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     debugImplementation(libs.compose.ui.tooling)
+
+    testImplementation(kotlin("test"))
 }

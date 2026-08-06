@@ -9,13 +9,14 @@ Scaffold plus the first slice of shared logic. Builds and passes on every target
 
 | Task | Result |
 | --- | --- |
-| `:shared:iosSimulatorArm64Test` | 31 tests, 0 failures |
-| `:shared:testDebugUnitTest` | 31 tests, 0 failures |
+| `:shared:testDebugUnitTest` | 59 tests, 0 failures |
+| `:shared:iosSimulatorArm64Test` | 59 tests, 0 failures |
+| `:androidApp:testDebugUnitTest` | 15 tests, 0 failures |
 | `:shared:linkReleaseFrameworkIosArm64` | `DriveMusicShared.framework` produced |
 | `:androidApp:assembleDebug` | APK produced |
 
-Same 31 tests run on both the Android and iOS targets from `commonTest`, which is the point —
-the shared logic is verified on each platform that will actually run it, not just on one.
+The 59 shared tests run on both the Android and iOS targets from `commonTest`, which is the point
+— the shared logic is verified on each platform that will actually run it, not just on one.
 
 ## Why the split is where it is
 
@@ -33,10 +34,10 @@ The iOS codebase is ~13,800 lines. Roughly:
 The audio engine is the one genuinely hard part. iOS builds a node graph with per-slot EQ, reverb
 and time-pitch units and crossfades between two of them; Android has no framework equivalent
 (`android.media.audiofx` attaches effects to an audio *session*, not per-node, and its quality is
-device-dependent). The intended approach is two Media3/ExoPlayer instances with a custom
-`AudioProcessor` chain per slot, and Media3's Sonic for the beatmatch stretch. Oboe/AAudio is not
-the answer here — it is for low-latency live audio and would mean owning all codec and streaming
-plumbing for no benefit a music player can hear.
+device-dependent). Oboe/AAudio is not the answer either — it is for low-latency live audio and
+would mean owning all codec and streaming plumbing for no benefit a music player can hear.
+
+**This is now spiked rather than assumed** — see *The audio spike* below.
 
 ### One thing to get right early
 
@@ -57,6 +58,9 @@ tests ported alongside it:
 - `recommendation/` — `Features`, `RecommendationModel`, `ListeningModel`
 - `playback/Shuffle` — the windowed weighted shuffle, including the queue-splice re-indexing
 - `analysis/MixPoints` — mix-in and mix-out detection
+- `transition/` — `TransitionCurve`, `TransitionShape`, the four presets, and `TransitionPlan`:
+  the whole of what a transition *is*, which is the highest-value thing in the codebase to have
+  exactly one copy of
 
 These carry across fixes made on the iOS side, deliberately, so the two do not drift:
 
@@ -70,6 +74,10 @@ These carry across fixes made on the iOS side, deliberately, so the two do not d
   it. Clearing made queueing one track re-randomize all of Up Next.
 - `MixPoints.mixOutPoint` is what stops a transition from having to wait for the last seconds of a
   track.
+- `TransitionCurve` sorts its keyframes when decoding, not only when constructed. The iOS version
+  uses its synthesized `Codable`, which reconstructs the array directly and skips the sort its own
+  initializer performs — so a stored shape whose keyframes are not already in order decodes into a
+  lane whose single forward scan reads the wrong segment for the whole transition.
 
 `ParsedMetadata` deliberately does **not** carry cover-art bytes, unlike its Swift counterpart.
 Inlining them there caused repeated memory problems — armed transitions, queue sheets and list
@@ -106,6 +114,34 @@ added late is one whose `expect`/`actual` gaps are found late.
 Nothing on the iOS side uses it yet. Switching over means deleting the corresponding Swift types
 and importing the framework, and it is worth doing early: until then every fix in this layer has
 to be made twice, which is exactly the cost this structure exists to avoid.
+
+## The audio spike
+
+`androidApp/audio` establishes that the transition is expressible on Media3. Two `ExoPlayer`
+instances, each built with its own `DefaultAudioSink` carrying its own `TransitionAudioProcessor`
+— that per-player hook is what makes this possible at all, since session-wide `audiofx` effects
+cannot do different things to two tracks at the same moment.
+
+The processor runs a per-channel biquad chain (high-pass, low-pass, bass shelf, then gain) whose
+parameters come from `SlotAutomation`, which reads the lanes of a `TransitionShape` from
+`:shared`. So "what a Mix sounds like" is defined once and both platforms apply the same numbers.
+
+Verified by measurement rather than by inspection: the filter tests push sine waves through and
+check the response, so a -24dB bass shelf is asserted to actually remove 24dB at 50Hz and leave
+4kHz alone, and each sweep's corner is asserted to be -3dB. `SlotAutomationTest` pins the seam
+between the shared curves and the engine.
+
+**Not yet done, and none of it hidden:**
+
+- **It has not been listened to.** For an audio path that is the only verification that finally
+  counts. Everything below is known from reading the code, not from hearing it.
+- Reverb is not applied. Media3 has no reverb processor, and `PresetReverb` attaches to a session
+  so it would wash both slots. `SlotAutomation.reverbWet` returns the lane value so the gap stays
+  visible; Rise leans on it heavily, Mix lightly and late.
+- The beatmatch stretch uses plain `PlaybackParameters`, which moves pitch with speed. Media3's
+  Sonic can hold pitch and should be used instead.
+- `TransitionPlan.outgoingLoop` is ignored, so Rise's held bar does not happen.
+- Sample format is 16-bit PCM only; float output is declined and Media3 converts.
 
 ## Not started
 
