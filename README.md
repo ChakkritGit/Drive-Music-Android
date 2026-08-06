@@ -11,7 +11,8 @@ Scaffold plus the first slice of shared logic. Builds and passes on every target
 | --- | --- |
 | `:shared:testDebugUnitTest` | 59 tests, 0 failures |
 | `:shared:iosSimulatorArm64Test` | 59 tests, 0 failures |
-| `:androidApp:testDebugUnitTest` | 15 tests, 0 failures |
+| `:androidApp:testDebugUnitTest` | 23 tests, 0 failures |
+| `:androidApp:connectedDebugAndroidTest` | 3 tests, 0 failures (emulator, API 36) |
 | `:shared:linkReleaseFrameworkIosArm64` | `DriveMusicShared.framework` produced |
 | `:androidApp:assembleDebug` | APK produced |
 
@@ -126,15 +127,31 @@ The processor runs a per-channel biquad chain (high-pass, low-pass, bass shelf, 
 parameters come from `SlotAutomation`, which reads the lanes of a `TransitionShape` from
 `:shared`. So "what a Mix sounds like" is defined once and both platforms apply the same numbers.
 
-Verified by measurement rather than by inspection: the filter tests push sine waves through and
-check the response, so a -24dB bass shelf is asserted to actually remove 24dB at 50Hz and leave
-4kHz alone, and each sweep's corner is asserted to be -3dB. `SlotAutomationTest` pins the seam
-between the shared curves and the engine.
+Verified at three levels, none of which involve trusting the code by reading it:
+
+- **Coefficients, by measurement.** `BiquadTest` pushes sine waves through and checks the
+  response, so a -24dB bass shelf is asserted to actually remove 24dB at 50Hz and leave 4kHz
+  alone, and each sweep's corner is asserted to be -3dB.
+- **The chain end to end.** `TransitionAudioProcessorTest` drives the real processor — configure,
+  flush, queue, read — and checks the wiring rather than the math: a plain fade's output envelope
+  is asserted to be exactly its volume lane, a zero-volume slot to be digital silence, stereo
+  channels not to bleed into each other, and a sample past full scale to clip rather than wrap.
+  These are the bugs an audio chain actually has, and none of them show up in a coefficient test.
+- **The runtime, on a device.** `CrossfadeEngineInstrumentedTest` runs on the emulator against
+  generated WAVs and proves the part that only exists at runtime: an `ExoPlayer` built with a
+  custom `DefaultAudioSink` carrying a custom processor really does decode, render and advance,
+  and a transition really does complete and hand over. If that wiring were wrong, every test above
+  would still pass while nothing made a sound.
+
+`SlotAutomationTest` pins the seam between the shared curves and the engine.
 
 **Not yet done, and none of it hidden:**
 
 - **It has not been listened to.** For an audio path that is the only verification that finally
-  counts. Everything below is known from reading the code, not from hearing it.
+  counts — everything above establishes that the chain does what the curves ask, and nothing at
+  all about whether what the curves ask sounds good. `TransitionDemoScreen` (the app's current
+  home screen) exists for exactly this: pick two files with the system picker, choose a preset and
+  a length, and hear it. It needs no auth, no networking and no library, so it can be used now.
 - Reverb is not applied. Media3 has no reverb processor, and `PresetReverb` attaches to a session
   so it would wash both slots. `SlotAutomation.reverbWet` returns the lane value so the gap stays
   visible; Rise leans on it heavily, Mix lightly and late.
