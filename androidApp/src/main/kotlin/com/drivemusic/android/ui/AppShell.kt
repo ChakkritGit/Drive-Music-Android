@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Row
@@ -108,6 +109,17 @@ fun AppShell(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showNowPlaying by remember { mutableStateOf(false) }
 
+    // Where the user is, held here rather than inside `AppShellContent`.
+    //
+    // Now Playing replaces that content in the `AnimatedContent` below, which takes it out of
+    // composition entirely — and with it every `remember` it owned. Closing Now Playing rebuilt it
+    // from its defaults, so leaving from Library came back to Home, a pushed screen was gone, and
+    // a typed search was lost. State that has to outlive the screen showing it belongs to whatever
+    // outlives that screen.
+    var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    var pushed by remember { mutableStateOf<Pushed?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+
     SharedTransitionLayout {
         AnimatedContent(
             targetState = showNowPlaying && state.currentTrack != null,
@@ -137,6 +149,12 @@ fun AppShell(
                     onExpand = { showNowPlaying = true },
                     onThemeChange = onThemeChange,
                     onSignOut = onSignOut,
+                    tab = tab,
+                    onTabChange = { tab = it },
+                    pushed = pushed,
+                    onPushedChange = { pushed = it },
+                    query = query,
+                    onQueryChange = { query = it },
                 )
             }
         }
@@ -155,12 +173,17 @@ private fun AppShellContent(
     onExpand: () -> Unit,
     onThemeChange: (com.drivemusic.android.player.AppTheme) -> Unit,
     onSignOut: () -> Unit,
+    // Hoisted — see the note where these are declared.
+    tab: Tab,
+    onTabChange: (Tab) -> Unit,
+    pushed: Pushed?,
+    onPushedChange: (Pushed?) -> Unit,
+    query: String,
+    onQueryChange: (String) -> Unit,
 ) {
-
-    var tab by remember { mutableStateOf(Tab.HOME) }
-    var pushed by remember { mutableStateOf<Pushed?>(null) }
+    // Stays local: a dialog cannot be open at the moment Now Playing is opened, so there is
+    // nothing here to lose.
     var addingToPlaylist by remember { mutableStateOf<DriveFile?>(null) }
-    var query by remember { mutableStateOf("") }
 
     // The library-backed tabs read what is downloaded, so they re-read on entry — after a
     // download, a playlist edit or a wipe the previous snapshot is stale.
@@ -168,7 +191,7 @@ private fun AppShellContent(
 
     // Android's Back gesture pops a pushed screen before leaving the app, same as the iOS
     // NavigationStack it mirrors.
-    androidx.activity.compose.BackHandler(enabled = pushed != null) { pushed = null }
+    androidx.activity.compose.BackHandler(enabled = pushed != null) { onPushedChange(null) }
 
     val pushedTitle = when (pushed) {
         is Pushed.CollectionDetail -> (pushed as Pushed.CollectionDetail).collection.title
@@ -207,13 +230,13 @@ private fun AppShellContent(
                             contentPadding = 0.dp,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                            onChange = { query = it },
+                            onChange = onQueryChange,
                         )
                     } else if (pushed == null && tab == Tab.HOME) {
                         SearchButton(
                             placeholder = stringResource(R.string.search_your_music),
                             modifier = Modifier.padding(end = 4.dp),
-                            onClick = { pushed = Pushed.Search },
+                            onClick = { onPushedChange(Pushed.Search) },
                         )
                     } else {
                         Text(pushedTitle ?: stringResource(tab.labelRes), maxLines = 1)
@@ -221,21 +244,21 @@ private fun AppShellContent(
                 },
                 navigationIcon = {
                     if (pushed != null) {
-                        IconButton(onClick = { pushed = null }) {
+                        IconButton(onClick = { onPushedChange(null) }) {
                             Icon(painterResource(AppIcons.ArrowBack), contentDescription = stringResource(R.string.back))
                         }
                     } else {
-                        IconButton(onClick = { pushed = Pushed.Profile }) { ProfileAvatar(container) }
+                        IconButton(onClick = { onPushedChange(Pushed.Profile) }) { ProfileAvatar(container) }
                     }
                 },
                 actions = {
                     // The header buttons stay on the top-level screens only — inside a pushed one
                     // the bar belongs to that screen.
                     if (pushed == null) {
-                        IconButton(onClick = { pushed = Pushed.Analytics }) {
+                        IconButton(onClick = { onPushedChange(Pushed.Analytics) }) {
                             Icon(painterResource(AppIcons.Insights), contentDescription = stringResource(R.string.analytics))
                         }
-                        IconButton(onClick = { pushed = Pushed.Settings }) {
+                        IconButton(onClick = { onPushedChange(Pushed.Settings) }) {
                             Icon(painterResource(AppIcons.Settings), contentDescription = stringResource(R.string.settings))
                         }
                     }
@@ -252,7 +275,7 @@ private fun AppShellContent(
                             // Tapping a tab also pops whatever is pushed — the tab is the
                             // destination, and landing on a detail screen belonging to a different
                             // section would be the wrong place.
-                            onClick = { tab = entry; pushed = null; query = "" },
+                            onClick = { onTabChange(entry); onPushedChange(null); onQueryChange("") },
                             icon = {
                                 Icon(painterResource(entry.iconRes), contentDescription = stringResource(entry.labelRes))
                             },
@@ -310,8 +333,8 @@ private fun AppShellContent(
                                 Tab.HOME -> HomeScreen(
                                     state = state,
                                     viewModel = viewModel,
-                                    onOpenSearch = { query = ""; pushed = Pushed.Search },
-                                ) { pushed = Pushed.CollectionDetail(it) }
+                                    onOpenSearch = { onQueryChange(""); onPushedChange(Pushed.Search) },
+                                ) { onPushedChange(Pushed.CollectionDetail(it)) }
 
                                 Tab.BROWSE -> BrowseScreen(
                                     drive = container.drive,
@@ -330,14 +353,14 @@ private fun AppShellContent(
                                     state = state,
                                     viewModel = viewModel,
                                     query = query,
-                                    onQueryChange = { query = it },
-                                ) { pushed = Pushed.CollectionDetail(it) }
+                                    onQueryChange = { onQueryChange(it) },
+                                ) { onPushedChange(Pushed.CollectionDetail(it)) }
 
                                 Tab.LIBRARY -> LibraryScreen(
                                     state = state,
                                     viewModel = viewModel,
                                     query = query,
-                                    onQueryChange = { query = it },
+                                    onQueryChange = { onQueryChange(it) },
                                 ) { addingToPlaylist = it }
                             }
                         }
