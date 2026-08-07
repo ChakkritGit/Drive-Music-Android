@@ -291,6 +291,10 @@ fun NowPlayingScreen(
                         rememberSharedContentState(ARTWORK_KEY),
                         animatedVisibilityScope = animatedScope,
                     )
+                    // iOS sits this below a real navigation bar plus its own 16pt of vertical
+                    // padding; here the header is a bare row of icon buttons, so without this the
+                    // cover starts almost immediately under the status bar.
+                    .padding(top = 16.dp)
                     .fillMaxWidth(0.82f)
                     .aspectRatio(1f),
             )
@@ -577,14 +581,23 @@ private fun QueueSheet(
                         // is easier to hit than the glyph.
                         onClick = viewModel::togglePlayPause,
                         trailing = {
-                            Icon(
-                                painterResource(
-                                    if (state.isPlaying) AppIcons.Equalizer else AppIcons.PlayArrow
-                                ),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
+                            // Given the same 48dp footprint the Up Next rows' overflow buttons
+                            // have. As a bare 20dp glyph it sat hard against the row's edge while
+                            // every row under it kept a button's worth of inset, so the trailing
+                            // column zig-zagged down the list.
+                            Box(
+                                modifier = Modifier.size(48.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    painterResource(
+                                        if (state.isPlaying) AppIcons.Equalizer else AppIcons.PlayArrow
+                                    ),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         },
                     )
                     TrackDivider()
