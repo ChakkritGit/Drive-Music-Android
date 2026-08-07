@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
@@ -47,6 +48,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,6 +81,14 @@ fun CollectionActions(
         }
     }
 }
+
+/**
+ * The cover's size on Now Playing.
+ *
+ * A fixed size rather than a fraction of the width, because the halo behind it has to be given the
+ * same number and a fraction is not knowable until layout.
+ */
+private val ARTWORK_SIZE = 300.dp
 
 /** The key both the mini player and Now Playing register their artwork under. */
 private const val ARTWORK_KEY = "now-playing-artwork"
@@ -125,9 +135,13 @@ private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Icon(painterResource(AppIcons.MusicNote),
+            // Proportional to the tile, not a fixed 48dp. At the mini player's 48dp cover that
+            // was a note filling the whole square edge to edge, so a track with no artwork looked
+            // like a deliberate icon rather than like a missing cover.
+            Icon(
+                painterResource(AppIcons.MusicNote),
                 contentDescription = null,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.fillMaxSize(0.4f),
                 tint = MaterialTheme.colorScheme.outline,
             )
         }
@@ -168,7 +182,7 @@ fun MiniPlayer(
             Row(
                 modifier = Modifier.fillMaxWidth().clickable(onClick = onExpand).padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 with(sharedScope) {
                     Artwork(
@@ -210,14 +224,36 @@ fun MiniPlayer(
                         }
                     }
                 }
-                IconButton(onClick = viewModel::togglePlayPause) {
+                // Previous, play, next — the same three iOS carries. Without previous, the only
+                // way back to the track that just ended was to open the full player, which is a
+                // screen away from a mistake that takes one tap to make.
+                IconButton(
+                    onClick = viewModel::previous,
+                    enabled = state.currentTrack != null,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        painterResource(AppIcons.SkipPrevious),
+                        contentDescription = stringResource(R.string.prev),
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                IconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(44.dp)) {
                     Icon(
                         painterResource(if (state.isPlaying) AppIcons.Pause else AppIcons.PlayArrow),
                         contentDescription = stringResource(if (state.isPlaying) R.string.pause else R.string.play),
                     )
                 }
-                IconButton(onClick = viewModel::next) {
-                    Icon(painterResource(AppIcons.SkipNext), contentDescription = stringResource(R.string.next))
+                IconButton(
+                    onClick = viewModel::next,
+                    enabled = state.currentTrack != null,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        painterResource(AppIcons.SkipNext),
+                        contentDescription = stringResource(R.string.next),
+                        modifier = Modifier.size(22.dp),
+                    )
                 }
             }
         }
@@ -260,6 +296,13 @@ fun NowPlayingScreen(
             )
         },
     ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+    if (state.ambientGlowEnabled) {
+        // Behind everything, and reading the level through a lambda rather than from state: it
+        // redraws every frame, and publishing a per-frame value through the player's state would
+        // invalidate every collector of it 60 times a second to move one gradient.
+        AmbientGlow(artwork = state.artwork, level = viewModel::audioLevel)
+    }
     Column(
         // Full-screen and inside the shared container, so it pads itself. `safeDrawing` rather
         // than `statusBars`: it also covers the gesture bar and any display cutout.
@@ -282,6 +325,13 @@ fun NowPlayingScreen(
             Spacer(modifier = Modifier.size(48.dp))
         }
 
+        Box(contentAlignment = Alignment.Center) {
+            if (!state.ambientGlowEnabled) {
+                // With the glow off there is nothing behind the cover at all and it sits flat on
+                // the background; with it on, the glow already does this and the two stack into
+                // mud.
+                ArtworkHalo(state.artwork, size = ARTWORK_SIZE)
+            }
         with(sharedScope) {
             Artwork(
                 state.artwork,
@@ -294,9 +344,9 @@ fun NowPlayingScreen(
                     // padding; here the header is a bare row of icon buttons, so without this the
                     // cover starts almost immediately under the status bar.
                     .padding(top = 40.dp)
-                    .fillMaxWidth(0.82f)
-                    .aspectRatio(1f),
+                    .size(ARTWORK_SIZE),
             )
+        }
         }
 
         // Left-aligned, with the favourite toggle on the title's own row.
@@ -404,6 +454,8 @@ fun NowPlayingScreen(
     }
     }
 
+    }
+
     if (queueOpen) {
         QueueSheet(
             state = state,
@@ -467,6 +519,13 @@ private fun MixBadge() {
  */
 @Composable
 private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
+    // Whether the mix engine is set up for this track. Crossfade is checked as well as Auto mix
+    // because Auto mix alone does nothing — it shapes a crossfade rather than being a transition of
+    // its own. Deliberately not gated on `isPlaying`: the glow uses this so it stays mounted across
+    // a pause and can animate itself away, where a view removed outright has nothing left to run an
+    // animation with.
+    val isMixReady = state.crossfadeEnabled && state.autoMixEnabled && state.currentTrack != null
+
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -486,6 +545,39 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
             Icon(painterResource(AppIcons.SkipPrevious), contentDescription = stringResource(R.string.prev), modifier = Modifier.size(34.dp))
         }
 
+        Box(contentAlignment = Alignment.Center) {
+        if (isMixReady) {
+            // Retracts to just inside the button's own circle rather than to nothing: shrinking to
+            // a point reads as the strands being sucked in, while stopping at the button's edge
+            // reads as them sliding in behind it, which is what is meant.
+            val scale by androidx.compose.animation.core.animateFloatAsState(
+                if (state.isPlaying) 1f else 0.72f,
+                androidx.compose.animation.core.tween(550),
+                label = "mixGlowScale",
+            )
+            // Fade trails the scale: while the strands are still wider than the button they need
+            // to be visible, and by the time they are tucked under it they need to be gone.
+            val fade by androidx.compose.animation.core.animateFloatAsState(
+                if (state.isPlaying) 1f else 0f,
+                androidx.compose.animation.core.tween(400),
+                label = "mixGlowFade",
+            )
+            if (fade > 0.01f) {
+                MixGlow(
+                    // Drawn unbounded, so the glow does not contribute its own width to the row.
+                    // Sized normally it made the transport 128dp wide at the centre and pushed
+                    // shuffle and repeat out to the screen's edges. iOS puts this in a
+                    // `.background`, which is layout-neutral for the same reason.
+                    modifier = Modifier
+                        .wrapContentSize(unbounded = true)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = fade
+                        },
+                )
+            }
+        }
         Box(
             modifier = Modifier.size(72.dp).clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary),
@@ -503,6 +595,7 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
                     modifier = Modifier.size(38.dp),
                 )
             }
+        }
         }
 
         IconButton(

@@ -69,6 +69,18 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
         )
         }
 
+        // Its own section, as on iOS: this is the only setting that changes how the Now Playing
+        // screen looks rather than how playback sounds, and filing it under Sound would be wrong.
+        SettingsSection(stringResource(R.string.now_playing))
+        SettingsGroup {
+            SwitchRow(
+                title = stringResource(R.string.ambient_light),
+                subtitle = stringResource(R.string.shows_a_soft_audio_reactive_glow_behind_the_artwork_on_the_n),
+                checked = state.ambientGlowEnabled,
+                onChange = viewModel::setAmbientGlowEnabled,
+            )
+        }
+
         SettingsSection(stringResource(R.string.sound))
         SettingsGroup {
         SwitchRow(
