@@ -58,7 +58,7 @@ fun PlaylistsScreen(
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         // Search and the create row are part of the scroll, so they move out of the way rather
         // than holding a fixed slice of the screen.
-        item { SearchField(query, stringResource(R.string.search_playlists), onQueryChange) }
+        item { SearchField(query, stringResource(R.string.search_playlists), onChange = onQueryChange) }
         item {
         // Inline creation rather than a dialog behind a "+" — matches iOS, and making a playlist
         // is the thing this screen is for.

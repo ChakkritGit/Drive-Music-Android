@@ -120,19 +120,93 @@ fun CollectionCard(
 
 private val CARD_SIZE = 160.dp
 
+/**
+ * The one search control's shape: a full-width pill on a raised container.
+ *
+ * Both the button and the field wear it, so pressing Home's search button does not hand you a
+ * differently-shaped box — the control you tapped is the control you end up typing in, and it
+ * simply grows a cursor. An outlined field would announce itself as a different widget.
+ */
+private val SEARCH_SHAPE = RoundedCornerShape(28.dp)
+
+@Composable
+private fun searchColors() = androidx.compose.material3.TextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    // The pill's own edge is the boundary; an indicator line under it draws a second one.
+    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+    disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+)
+
 /** The single search field used by every list screen. */
 @Composable
-fun SearchField(value: String, placeholder: String, onChange: (String) -> Unit) {
-    androidx.compose.material3.OutlinedTextField(
+fun SearchField(
+    value: String,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (() -> Unit)? = null,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions =
+        androidx.compose.foundation.text.KeyboardOptions.Default,
+    keyboardActions: androidx.compose.foundation.text.KeyboardActions =
+        androidx.compose.foundation.text.KeyboardActions.Default,
+    onChange: (String) -> Unit,
+) {
+    androidx.compose.material3.TextField(
         value = value,
         onValueChange = onChange,
-        placeholder = { Text(placeholder) },
+        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.outline) },
         singleLine = true,
+        shape = SEARCH_SHAPE,
+        colors = searchColors(),
         leadingIcon = {
-            Icon(painterResource(AppIcons.Search), contentDescription = null)
+            Icon(
+                painterResource(AppIcons.Search),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+            )
         },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        trailingIcon = trailing,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     )
+}
+
+/**
+ * A search field that is not one yet: it looks exactly like [SearchField] but only navigates.
+ *
+ * Used where searching means leaving for a screen of its own, so the affordance is honest about
+ * being a button while still promising the thing it leads to.
+ */
+@Composable
+fun SearchButton(placeholder: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        shape = SEARCH_SHAPE,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                painterResource(AppIcons.Search),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+            )
+            Text(
+                placeholder,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 12.dp),
+            )
+        }
+    }
 }
 
 /**

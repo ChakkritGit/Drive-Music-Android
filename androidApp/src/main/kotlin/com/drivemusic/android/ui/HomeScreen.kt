@@ -54,7 +54,7 @@ fun HomeScreen(
 
     if (!hasAnything) {
         Column(modifier = Modifier.fillMaxSize()) {
-            SearchButton(onOpenSearch)
+            GreetingHeader()
             EmptyState(
                 message = stringResource(R.string.nothing_to_show_yet_head_to_browse_to_play_something_from_yo),
             )
@@ -83,9 +83,11 @@ fun HomeScreen(
         contentPadding = PaddingValues(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        // First item, not a fixed header: it scrolls away with the shelves and comes back on the
-        // way up.
-        item { SearchButton(onOpenSearch) }
+        // The greeting, which used to be the top bar's title. It has traded places with the
+        // search button: a greeting is a nicety that has earned no permanent slice of the screen,
+        // so it scrolls away with the shelves, while search — wanted at any point, from any scroll
+        // position — took the pinned slot it vacated.
+        item { GreetingHeader() }
 
         if (state.recentSources.isNotEmpty()) {
             item {
@@ -312,32 +314,21 @@ fun EmptyState(message: String, title: String? = null) {
  * A live field here would need the shelves to become results as you type, which is two screens
  * fighting over one list. A button says plainly that searching goes somewhere.
  */
-@Composable
-private fun SearchButton(onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                painterResource(AppIcons.Search),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline,
-            )
-            Text(
-                stringResource(R.string.search_your_music),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.outline,
-            )
-        }
-    }
-}
 
 /** How many items a browse shelf shows. */
 private const val SHELF_LIMIT = 20
+
+/**
+ * "Good evening", as content rather than as a title bar.
+ *
+ * It reads as a headline here, which is what it always was — the top bar was giving a permanent,
+ * pinned slot to a line that says nothing actionable and never changes within a session.
+ */
+@Composable
+private fun GreetingHeader() {
+    Text(
+        greeting(),
+        style = MaterialTheme.typography.headlineSmall,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
+}

@@ -55,7 +55,9 @@ import com.drivemusic.shared.model.DriveFile
  * information: an icon at the trailing edge says the same thing without taking the subtitle's
  * place.
  *
- * There was no way to see or change whether a track was a favourite from a list at all.
+ * There was no way to change whether a track was a favourite from a list at all. Favouriting lives
+ * in the overflow menu and is deliberately not marked on the row: a heart repeated down a list of
+ * mostly-favourites is the same non-information "Downloaded" was, and the trailing edge is narrow.
  */
 @Composable
 fun TrackListRow(
@@ -116,14 +118,6 @@ fun TrackListRow(
             )
         }
 
-        if (isFavorite) {
-            Icon(
-                painterResource(AppIcons.Favorite),
-                contentDescription = stringResource(R.string.favourite),
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp),
-            )
-        }
         if (isDownloaded) {
             Icon(
                 painterResource(AppIcons.CloudDone),

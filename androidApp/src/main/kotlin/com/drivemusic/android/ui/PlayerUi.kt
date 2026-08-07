@@ -75,6 +75,29 @@ fun CollectionActions(onPlay: () -> Unit, onShuffle: () -> Unit) {
 /** The key both the mini player and Now Playing register their artwork under. */
 private const val ARTWORK_KEY = "now-playing-artwork"
 
+/**
+ * The rest of the container transform.
+ *
+ * Sharing only the artwork made the cover fly while everything around it cross-faded, which reads
+ * as two unrelated animations rather than as one surface growing. The title and artist follow the
+ * cover, and the mini player's own surface morphs into the full screen's background so there is a
+ * continuous container the whole way — that container is what makes the gesture feel like opening
+ * the thing you touched instead of replacing it.
+ */
+private const val CONTAINER_KEY = "now-playing-container"
+private const val TITLE_KEY = "now-playing-title"
+private const val ARTIST_KEY = "now-playing-artist"
+
+/**
+ * Text scales between the two sizes rather than being re-laid-out at every frame: the title goes
+ * from `bodyMedium` to `titleLarge`, and remeasuring type mid-flight produces reflow judder.
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+private val TEXT_RESIZE = SharedTransitionScope.ResizeMode.ScaleToBounds(
+    contentScale = ContentScale.FillWidth,
+    alignment = Alignment.CenterStart,
+)
+
 /** Decoded once per track rather than per recomposition — a cover is a megabyte of bitmap. */
 @Composable
 private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
@@ -114,7 +137,16 @@ fun MiniPlayer(
 ) {
     val track = state.currentTrack ?: return
 
-    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        tonalElevation = 3.dp,
+        modifier = with(sharedScope) {
+            Modifier.fillMaxWidth().sharedBounds(
+                rememberSharedContentState(CONTAINER_KEY),
+                animatedVisibilityScope = animatedScope,
+                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+            )
+        },
+    ) {
         // No inset padding here: the mini player sits directly above the navigation bar, which
         // Material3 already insets itself. Padding both left a gap the height of the gesture bar
         // between them.
@@ -142,20 +174,32 @@ fun MiniPlayer(
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        state.metadata?.title ?: track.displayName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    state.metadata?.artist?.let {
+                    with(sharedScope) {
                         Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline,
+                            state.metadata?.title ?: track.displayName,
+                            style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.sharedBounds(
+                                rememberSharedContentState(TITLE_KEY),
+                                animatedVisibilityScope = animatedScope,
+                                resizeMode = TEXT_RESIZE,
+                            ),
                         )
+                        state.metadata?.artist?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.sharedBounds(
+                                    rememberSharedContentState(ARTIST_KEY),
+                                    animatedVisibilityScope = animatedScope,
+                                    resizeMode = TEXT_RESIZE,
+                                ),
+                            )
+                        }
                     }
                 }
                 IconButton(onClick = viewModel::togglePlayPause) {
@@ -193,9 +237,21 @@ fun NowPlayingScreen(
     var scrubbing by remember { mutableStateOf<Float?>(null) }
     var queueOpen by remember { mutableStateOf(false) }
 
+    // The mini player's surface, grown to fill the screen. Sharing the container rather than
+    // cross-fading the two backgrounds is what makes this read as one surface expanding: without
+    // it the cover flies across a screen that is simultaneously dissolving underneath it.
+    Surface(
+        modifier = with(sharedScope) {
+            Modifier.fillMaxSize().sharedBounds(
+                rememberSharedContentState(CONTAINER_KEY),
+                animatedVisibilityScope = animatedScope,
+                resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+            )
+        },
+    ) {
     Column(
-        // Full-screen and outside the Scaffold, so it pads itself. `safeDrawing` rather than
-        // `statusBars`: it also covers the gesture bar and any display cutout.
+        // Full-screen and inside the shared container, so it pads itself. `safeDrawing` rather
+        // than `statusBars`: it also covers the gesture bar and any display cutout.
         modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -234,13 +290,21 @@ fun NowPlayingScreen(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    state.metadata?.title ?: track.displayName,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+                with(sharedScope) {
+                    Text(
+                        state.metadata?.title ?: track.displayName,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .sharedBounds(
+                                rememberSharedContentState(TITLE_KEY),
+                                animatedVisibilityScope = animatedScope,
+                                resizeMode = TEXT_RESIZE,
+                            ),
+                    )
+                }
                 IconButton(onClick = { viewModel.toggleFavorite(track) }) {
                     Icon(
                         painterResource(if (state.isCurrentFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder),
@@ -254,14 +318,21 @@ fun NowPlayingScreen(
             if (state.error != null) {
                 Text(state.error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             } else {
-                Text(
-                    listOfNotNull(state.metadata?.artist, state.metadata?.album).joinToString(" · ")
-                        .ifEmpty { " " },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                with(sharedScope) {
+                    Text(
+                        listOfNotNull(state.metadata?.artist, state.metadata?.album)
+                            .joinToString(" · ").ifEmpty { " " },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.sharedBounds(
+                            rememberSharedContentState(ARTIST_KEY),
+                            animatedVisibilityScope = animatedScope,
+                            resizeMode = TEXT_RESIZE,
+                        ),
+                    )
+                }
             }
 
             state.source?.let {
@@ -307,6 +378,7 @@ fun NowPlayingScreen(
                 )
             }
         }
+    }
     }
 
     if (queueOpen) {

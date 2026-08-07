@@ -13,7 +13,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,15 +70,13 @@ fun SearchScreen(
     val source = remember { PlaySource("__library__", "", PlaySource.Kind.LIBRARY) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        OutlinedTextField(
+        // The same pill Home's search button wears, so arriving here reads as that button
+        // growing a cursor rather than as a different widget replacing it.
+        SearchField(
             value = query,
-            onValueChange = onQueryChange,
-            placeholder = { Text(stringResource(R.string.search_your_music)) },
-            singleLine = true,
-            leadingIcon = {
-                Icon(painterResource(AppIcons.Search), contentDescription = null)
-            },
-            trailingIcon = {
+            placeholder = stringResource(R.string.search_your_music),
+            modifier = Modifier.focusRequester(focusRequester),
+            trailing = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
                         Icon(painterResource(AppIcons.Close), contentDescription = stringResource(R.string.close))
@@ -88,9 +85,7 @@ fun SearchScreen(
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-            modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .focusRequester(focusRequester),
+            onChange = onQueryChange,
         )
 
         when {

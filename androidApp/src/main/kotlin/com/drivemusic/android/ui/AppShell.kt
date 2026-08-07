@@ -160,10 +160,6 @@ private fun AppShellContent(
     // NavigationStack it mirrors.
     androidx.activity.compose.BackHandler(enabled = pushed != null) { pushed = null }
 
-    // Home is titled by the time of day rather than by its own name — the section is obvious
-    // from the highlighted tab, so the title is free to say something else.
-    val homeTitle = greeting()
-
     val pushedTitle = when (pushed) {
         is Pushed.CollectionDetail -> (pushed as Pushed.CollectionDetail).collection.title
         Pushed.Settings -> stringResource(R.string.settings)
@@ -179,11 +175,18 @@ private fun AppShellContent(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        pushedTitle
-                            ?: if (tab == Tab.HOME) homeTitle else stringResource(tab.labelRes),
-                        maxLines = 1,
-                    )
+                    // Home puts search in the title slot and its greeting into the scroll — the
+                    // two have swapped. Search is wanted from any scroll position, so it is the
+                    // one that earns the pinned row; a greeting is not.
+                    if (pushed == null && tab == Tab.HOME) {
+                        SearchButton(
+                            placeholder = stringResource(R.string.search_your_music),
+                            modifier = Modifier.padding(end = 4.dp),
+                            onClick = { pushed = Pushed.Search },
+                        )
+                    } else {
+                        Text(pushedTitle ?: stringResource(tab.labelRes), maxLines = 1)
+                    }
                 },
                 navigationIcon = {
                     if (pushed != null) {
@@ -324,7 +327,7 @@ private fun AppShellContent(
  * app's in-app language override rather than the device's system language.
  */
 @Composable
-private fun greeting(): String {
+internal fun greeting(): String {
     val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     return stringResource(
         when {
