@@ -75,6 +75,8 @@ class PlayerViewModel(
         val recentSources: List<RecentSource> = emptyList(),
         val cacheBytes: Long = 0,
         val downloadProgress: Pair<Int, Int>? = null,
+        /** How many times the model has been trained — Home says so until it has enough. */
+        val trainingEvents: Int = 0,
     ) {
         val currentTrack: DriveFile? get() = queue.currentTrack
 
@@ -86,12 +88,25 @@ class PlayerViewModel(
             }
         val upNext get() = PlaybackQueue.upNext(queue)
 
-        /** Downloaded tracks grouped by artist, for the Home shelves. */
+        /**
+         * Downloaded tracks grouped by artist, most-represented first and capped.
+         *
+         * By count rather than alphabetically, and capped at [ARTIST_SHELF_LIMIT]: this is a
+         * "browse by" shelf, not a complete index, and an alphabetical list buries the artists
+         * the library is actually made of behind whoever happens to start with an A.
+         *
+         * Tracks with no artist tag are left out rather than collected under a placeholder —
+         * "Unknown artist" is not an artist anyone wants to browse to.
+         */
         val artists: List<Pair<String, List<CachedTrack>>>
             get() = cachedTracks
-                .groupBy { it.parsedMeta.artist?.takeIf(String::isNotBlank) ?: "Unknown artist" }
+                .mapNotNull { track ->
+                    track.parsedMeta.artist?.trim()?.takeIf { it.isNotEmpty() }?.let { it to track }
+                }
+                .groupBy({ it.first }, { it.second })
                 .toList()
-                .sortedBy { it.first.lowercase() }
+                .sortedByDescending { it.second.size }
+                .take(ARTIST_SHELF_LIMIT)
     }
 
     private val engine = CrossfadeEngine(application, viewModelScope)
@@ -142,6 +157,7 @@ class PlayerViewModel(
 
         viewModelScope.launch {
             model = library.loadModel()
+            _state.update { it.copy(trainingEvents = model.trainingEvents) }
             refreshLibrary()
             restoreSession()
         }
@@ -376,6 +392,9 @@ class PlayerViewModel(
      * Playlists tab and on Home for free, and there is one concept of "a set of tracks" rather
      * than two.
      */
+    /** Whether the model has seen enough plays for its ranking to mean anything. */
+    val isModelTrained: Boolean get() = model.trainingEvents >= TRAINED_THRESHOLD
+
     fun toggleFavorite(file: DriveFile) {
         viewModelScope.launch {
             val favorites = library.listPlaylists().firstOrNull { it.name == FAVORITES }
@@ -632,6 +651,9 @@ class PlayerViewModel(
             val features = Features.extract(file, _state.value.metadata, Clock.System.now())
             model = RecommendationModel.trainStep(model, features, fraction.coerceIn(0.0, 1.0))
             library.saveModel(model)
+            // Home re-ranks "Made For You" off this, and says "Learning your taste…" until the
+            // count clears the threshold.
+            _state.update { it.copy(trainingEvents = model.trainingEvents) }
         }
     }
 
@@ -656,6 +678,10 @@ class PlayerViewModel(
 
     companion object {
         const val FAVORITES = "Favourites"
+
+        /** Plays before the model's ranking is worth showing as a recommendation. */
+        const val TRAINED_THRESHOLD = 5
+        const val ARTIST_SHELF_LIMIT = 20
     }
 
     override fun onCleared() {

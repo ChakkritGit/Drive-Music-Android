@@ -57,17 +57,26 @@ fun HomeScreen(
 
     if (!hasAnything) {
         EmptyState(
-            title = stringResource(R.string.nothing_to_show_yet),
-            message = stringResource(R.string.head_to_browse),
+            message = stringResource(R.string.nothing_to_show_yet_head_to_browse_to_play_something_from_yo),
         )
         return
     }
 
     val shuffleAll = remember(state.cachedTracks) { state.cachedTracks.map { it.driveMeta } }
+    // Capped, like the other two: these are shelves to browse from, not complete indexes.
     val recentlyAdded = remember(state.cachedTracks) {
-        state.cachedTracks.sortedByDescending { it.cachedAt }.map { it.driveMeta }
+        state.cachedTracks.sortedByDescending { it.cachedAt }.take(SHELF_LIMIT).map { it.driveMeta }
     }
-    val madeForYou = remember(state.cachedTracks) { viewModel.recommended(20).map { it.driveMeta } }
+    // Keyed on the training count as well as the library, so the ranking re-reads once the model
+    // has learned something new rather than staying frozen for the session.
+    val madeForYou = remember(state.cachedTracks, state.trainingEvents) {
+        viewModel.recommended(SHELF_LIMIT).map { it.driveMeta }
+    }
+    // Favourites first — it is the playlist most likely to be wanted, and it is an ordinary
+    // playlist under the hood so nothing else distinguishes it.
+    val playlists = remember(state.playlists) {
+        state.playlists.sortedByDescending { it.name == PlayerViewModel.FAVORITES }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -101,13 +110,18 @@ fun HomeScreen(
             item {
                 val playlistLabel = stringResource(R.string.playlist)
                 Shelf(stringResource(R.string.your_playlists), null) {
-                    items(state.playlists, key = { it.id }) { playlist ->
+                    items(playlists, key = { it.id }) { playlist ->
                         CollectionCardFor(
                             viewModel = viewModel,
                             title = playlist.name,
                             subtitle = trackCount(playlist.tracks.size),
                             tracks = playlist.tracks,
-                            fallbackIcon = AppIcons.Favorite,
+                            // Only Favourites gets the heart; every other playlist is a note.
+                            fallbackIcon = if (playlist.name == PlayerViewModel.FAVORITES) {
+                                AppIcons.Favorite
+                            } else {
+                                AppIcons.MusicNote
+                            },
                             onClick = {
                                 onOpenCollection(
                                     Collection(
@@ -131,7 +145,12 @@ fun HomeScreen(
                 val recentlyAddedTitle = stringResource(R.string.recently_added)
                 val fromDownloads = stringResource(R.string.from_your_downloads)
                 val madeForYouTitle = stringResource(R.string.made_for_you)
-                val basedOnListening = stringResource(R.string.based_on_your_listening)
+                // Says what it is actually doing: with too few plays behind it the ranking is
+                // not yet a recommendation, and claiming otherwise would be a small lie.
+                val madeForYouSubtitle = stringResource(
+                    if (viewModel.isModelTrained) R.string.based_on_your_listening
+                    else R.string.learning_your_taste
+                )
 
                 Shelf(stringResource(R.string.recommended_for_you), AppIcons.AutoAwesome) {
                     item {
@@ -152,9 +171,9 @@ fun HomeScreen(
                     }
                     item {
                         CollectionCardFor(
-                            viewModel, madeForYouTitle, basedOnListening, madeForYou,
+                            viewModel, madeForYouTitle, madeForYouSubtitle, madeForYou,
                             onClick = {
-                                onOpenCollection(Collection(madeForYouTitle, basedOnListening, madeForYou, null))
+                                onOpenCollection(Collection(madeForYouTitle, madeForYouSubtitle, madeForYou, null))
                             },
                         )
                     }
@@ -244,18 +263,23 @@ private fun SearchResults(state: PlayerViewModel.UiState, viewModel: PlayerViewM
     }
 
     if (matches.isEmpty()) {
-        EmptyState(stringResource(R.string.no_matches), stringResource(R.string.no_downloaded_tracks_match, query))
+        EmptyState(message = stringResource(R.string.no_tracks_match, query))
         return
     }
 
-    val queue = remember(matches) { matches.map { it.driveMeta } }
+    // The queue is the *whole* downloaded set, not just the matches — playing a search result
+    // should carry on into the rest of the library rather than stopping dead at the end of a
+    // filter the user has already forgotten about.
+    val queue = remember(state.cachedTracks) { state.cachedTracks.map { it.driveMeta } }
+    val source = remember { PlaySource("__library__", "", PlaySource.Kind.LIBRARY) }
+
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(matches, key = { it.fileId }) { track ->
             CachedTrackRow(
                 viewModel = viewModel,
                 track = track,
                 isPlaying = state.currentTrack?.id == track.fileId,
-                onClick = { viewModel.play(queue, queue.indexOfFirst { it.id == track.fileId }, null) },
+                onClick = { viewModel.play(queue, queue.indexOfFirst { it.id == track.fileId }, source) },
                 onQueue = { viewModel.addToQueue(track.driveMeta) },
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
@@ -295,13 +319,15 @@ fun SectionHeader(title: String, subtitle: String? = null) {
 }
 
 @Composable
-fun EmptyState(title: String, message: String) {
+fun EmptyState(message: String, title: String? = null) {
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        title?.let {
+            Text(it, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        }
         Text(
             message,
             style = MaterialTheme.typography.bodyMedium,
@@ -311,3 +337,6 @@ fun EmptyState(title: String, message: String) {
         )
     }
 }
+
+/** How many items a browse shelf shows. */
+private const val SHELF_LIMIT = 20

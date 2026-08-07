@@ -65,7 +65,7 @@ fun CollectionDetailScreen(
         )
 
             if (collection.tracks.isEmpty()) {
-                EmptyState(stringResource(R.string.nothing_here), stringResource(R.string.collection_empty))
+                EmptyState(stringResource(R.string.collection_empty))
                 return@Column
             }
 

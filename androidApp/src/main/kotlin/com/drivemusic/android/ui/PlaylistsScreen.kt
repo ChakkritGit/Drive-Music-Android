@@ -79,11 +79,10 @@ fun PlaylistsScreen(
 
         if (state.playlists.isEmpty()) {
             EmptyState(
-                stringResource(R.string.no_playlists_yet),
-                stringResource(R.string.no_playlists_detail),
+                message = stringResource(R.string.no_playlists_yet_create_one_above_or_add_a_track_to_a_new_pl),
             )
         } else if (visible.isEmpty()) {
-            EmptyState(stringResource(R.string.no_matches), stringResource(R.string.no_playlists_match, query))
+            EmptyState(message = stringResource(R.string.no_playlists_match, query))
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(visible, key = { it.id }) { playlist ->

@@ -159,6 +159,10 @@ private fun AppShellContent(
     // NavigationStack it mirrors.
     androidx.activity.compose.BackHandler(enabled = pushed != null) { pushed = null }
 
+    // Home is titled by the time of day rather than by its own name — the section is obvious
+    // from the highlighted tab, so the title is free to say something else.
+    val homeTitle = greeting()
+
     val pushedTitle = when (pushed) {
         is Pushed.CollectionDetail -> (pushed as Pushed.CollectionDetail).collection.title
         Pushed.Settings -> stringResource(R.string.settings)
@@ -171,7 +175,13 @@ private fun AppShellContent(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(pushedTitle ?: stringResource(tab.labelRes), maxLines = 1) },
+                title = {
+                    Text(
+                        pushedTitle
+                            ?: if (tab == Tab.HOME) homeTitle else stringResource(tab.labelRes),
+                        maxLines = 1,
+                    )
+                },
                 navigationIcon = {
                     if (pushed != null) {
                         IconButton(onClick = { pushed = null }) {
@@ -291,6 +301,24 @@ private fun AppShellContent(
     }
 
     AddToPlaylistHost(addingToPlaylist, state, viewModel) { addingToPlaylist = null }
+}
+
+/**
+ * "Good morning" / "Good afternoon" / "Good evening", by the device's own clock.
+ *
+ * Read through `stringResource` rather than resolved to a `String` elsewhere, so it follows the
+ * app's in-app language override rather than the device's system language.
+ */
+@Composable
+private fun greeting(): String {
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    return stringResource(
+        when {
+            hour < 12 -> R.string.good_morning
+            hour < 18 -> R.string.good_afternoon
+            else -> R.string.good_evening
+        }
+    )
 }
 
 /** The account's initial, standing in for the avatar the iOS toolbar shows. */
