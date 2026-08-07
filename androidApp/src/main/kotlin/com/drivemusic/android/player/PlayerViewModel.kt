@@ -66,6 +66,7 @@ class PlayerViewModel(
         val crossfadeEnabled: Boolean = true,
         val autoMixEnabled: Boolean = true,
         val gaplessEnabled: Boolean = true,
+        val ambientGlowEnabled: Boolean = true,
         val volumeNormalizationEnabled: Boolean = true,
         val crossfadeSeconds: Double = 8.0,
         val eq: EqSettings = EqSettings.flat,
@@ -154,6 +155,7 @@ class PlayerViewModel(
                 crossfadeSeconds = settings.crossfadeSeconds,
                 autoMixEnabled = settings.autoMixEnabled,
                 gaplessEnabled = settings.gaplessEnabled,
+                ambientGlowEnabled = settings.ambientGlowEnabled,
                 volumeNormalizationEnabled = settings.volumeNormalizationEnabled,
                 eq = stored,
             )
@@ -275,6 +277,22 @@ class PlayerViewModel(
         _state.update { it.copy(crossfadeEnabled = enabled) }
     }
 
+    fun setAmbientGlowEnabled(enabled: Boolean) {
+        settings.ambientGlowEnabled = enabled
+        _state.update { it.copy(ambientGlowEnabled = enabled) }
+    }
+
+    /**
+     * The current output level, 0..1 — read straight from the audio chain rather than published
+     * through [state].
+     *
+     * The glow that uses this redraws every frame; routing a per-frame value through a `StateFlow`
+     * would invalidate every collector of the whole player state 60 times a second to move one
+     * gradient. Callers poll this from their own frame loop instead, exactly as the iOS version
+     * reads `levelTap.currentLevel` from inside its `TimelineView`.
+     */
+    fun audioLevel(): Float = engine.currentLevel()
+
     fun setAutoMixEnabled(enabled: Boolean) {
         settings.autoMixEnabled = enabled
         _state.update { it.copy(autoMixEnabled = enabled) }
@@ -383,6 +401,7 @@ class PlayerViewModel(
                 crossfadeSeconds = settings.crossfadeSeconds,
                 autoMixEnabled = settings.autoMixEnabled,
                 gaplessEnabled = settings.gaplessEnabled,
+                ambientGlowEnabled = settings.ambientGlowEnabled,
                 volumeNormalizationEnabled = settings.volumeNormalizationEnabled,
                 eq = settings.eq,
             )

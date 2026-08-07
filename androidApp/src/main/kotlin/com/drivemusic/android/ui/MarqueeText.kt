@@ -3,7 +3,7 @@ package com.drivemusic.android.ui
 import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
@@ -23,7 +24,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
@@ -56,16 +56,15 @@ fun MarqueeText(
     color: Color = Color.Unspecified,
     isActive: Boolean = true,
 ) {
-    val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     var containerWidth by remember { mutableIntStateOf(0) }
+    var textWidth by remember { mutableIntStateOf(0) }
 
-    // Measured, not estimated: Compose can ask the same text engine that will draw it, so the
-    // marquee starts exactly when the text stops fitting rather than a few characters either side
-    // of it.
-    val textWidth = remember(text, style, density) {
-        measurer.measure(text, style, maxLines = 1, softWrap = false).size.width
-    }
+    // Both widths come from the laid-out nodes themselves rather than from a separate
+    // `TextMeasurer` pass. A measurement taken outside the layout does not necessarily agree with
+    // what the layout produces — it disagreed here by about 60dp, and the text stopped that far
+    // short of the trailing edge with a gap where its tail should have been. Reading the real
+    // width makes the two agree by construction.
     val overflow = max(0, textWidth - containerWidth)
     val scrolls = isActive && overflow > 1 && containerWidth > 0
 
@@ -131,11 +130,24 @@ fun MarqueeText(
                 // container and simply ends there, so scrolling left revealed blank space where
                 // the tail should have been: the last part of the title was never laid out.
                 modifier = Modifier
-                    .requiredWidth(with(density) { textWidth.toDp() })
+                    .wrapContentWidth(Alignment.Start, unbounded = true)
+                    .onSizeChanged { textWidth = it.width }
                     .graphicsLayer { translationX = -overflow * progress },
             )
         } else {
-            Text(text, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Laid out unbounded too, so its real width is known before it is known whether it
+            // overflows — otherwise a title that needs to scroll would first be truncated, and a
+            // truncated string always "fits".
+            Text(
+                text,
+                style = style,
+                color = color,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier
+                    .wrapContentWidth(Alignment.Start, unbounded = true)
+                    .onSizeChanged { textWidth = it.width },
+            )
         }
     }
 }
