@@ -45,10 +45,11 @@ fun HomeScreen(
     state: PlayerViewModel.UiState,
     viewModel: PlayerViewModel,
     query: String,
+    onQueryChange: (String) -> Unit,
     onOpenCollection: (Collection) -> Unit,
 ) {
     if (query.isNotBlank()) {
-        SearchResults(state, viewModel, query)
+        SearchResults(state, viewModel, query, onQueryChange)
         return
     }
 
@@ -56,9 +57,12 @@ fun HomeScreen(
         state.recentSources.isNotEmpty()
 
     if (!hasAnything) {
-        EmptyState(
-            message = stringResource(R.string.nothing_to_show_yet_head_to_browse_to_play_something_from_yo),
-        )
+        Column(modifier = Modifier.fillMaxSize()) {
+            HomeSearchField(query, onQueryChange)
+            EmptyState(
+                message = stringResource(R.string.nothing_to_show_yet_head_to_browse_to_play_something_from_yo),
+            )
+        }
         return
     }
 
@@ -83,6 +87,10 @@ fun HomeScreen(
         contentPadding = PaddingValues(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
+        // First item, not a fixed header: it scrolls away with the shelves and comes back on the
+        // way up, which is what `.searchable` does on iOS.
+        item { HomeSearchField(query, onQueryChange) }
+
         if (state.recentSources.isNotEmpty()) {
             item {
                 Shelf(stringResource(R.string.recently_played), AppIcons.Schedule) {
@@ -252,7 +260,12 @@ fun CollectionCardFor(
 }
 
 @Composable
-private fun SearchResults(state: PlayerViewModel.UiState, viewModel: PlayerViewModel, query: String) {
+private fun SearchResults(
+    state: PlayerViewModel.UiState,
+    viewModel: PlayerViewModel,
+    query: String,
+    onQueryChange: (String) -> Unit,
+) {
     val normalized = query.trim().lowercase()
     val matches = remember(state.cachedTracks, normalized) {
         state.cachedTracks.filter { track ->
@@ -263,7 +276,10 @@ private fun SearchResults(state: PlayerViewModel.UiState, viewModel: PlayerViewM
     }
 
     if (matches.isEmpty()) {
-        EmptyState(message = stringResource(R.string.no_tracks_match, query))
+        Column(modifier = Modifier.fillMaxSize()) {
+            HomeSearchField(query, onQueryChange)
+            EmptyState(message = stringResource(R.string.no_tracks_match, query))
+        }
         return
     }
 
@@ -274,6 +290,7 @@ private fun SearchResults(state: PlayerViewModel.UiState, viewModel: PlayerViewM
     val source = remember { PlaySource("__library__", "", PlaySource.Kind.LIBRARY) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item { HomeSearchField(query, onQueryChange) }
         items(matches, key = { it.fileId }) { track ->
             CachedTrackRow(
                 viewModel = viewModel,
@@ -336,6 +353,11 @@ fun EmptyState(message: String, title: String? = null) {
             modifier = Modifier.padding(top = 8.dp).fillMaxWidth(),
         )
     }
+}
+
+@Composable
+private fun HomeSearchField(query: String, onQueryChange: (String) -> Unit) {
+    SearchField(query, stringResource(R.string.search_your_music), onQueryChange)
 }
 
 /** How many items a browse shelf shows. */

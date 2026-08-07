@@ -60,6 +60,7 @@ fun LibraryScreen(
     state: PlayerViewModel.UiState,
     viewModel: PlayerViewModel,
     query: String,
+    onQueryChange: (String) -> Unit,
     onAddToPlaylist: (com.drivemusic.shared.model.DriveFile) -> Unit,
 ) {
     var sort by remember { mutableStateOf(TrackSort.RECENTLY_ADDED) }
@@ -85,40 +86,60 @@ fun LibraryScreen(
     val source = remember { PlaySource("library", "Library", PlaySource.Kind.LIBRARY) }
 
     if (state.cachedTracks.isEmpty()) {
-        EmptyState(
-            title = stringResource(R.string.library_empty),
-            message = stringResource(R.string.library_empty_detail),
-        )
+        Column(modifier = Modifier.fillMaxSize()) {
+            SearchField(query, stringResource(R.string.search_downloaded_tracks), onQueryChange)
+            EmptyState(
+                title = stringResource(R.string.library_empty),
+                message = stringResource(R.string.library_empty_detail),
+            )
+        }
         return
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        // Everything above the tracks is part of the scroll, so the search field and the header
+        // move out of the way as you go down the list rather than holding a fixed slice of the
+        // screen forever.
+        item { SearchField(query, stringResource(R.string.search_downloaded_tracks), onQueryChange) }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.downloaded_available_offline),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.weight(1f),
+                )
+                SortMenu(sort) { sort = it }
+            }
+        }
+        item {
             Text(
-                stringResource(R.string.downloaded_available_offline),
+                "${stringResource(R.string.track_count, sorted.size)} · ${formatBytes(state.cacheBytes)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
-            SortMenu(sort) { sort = it }
         }
-        Text(
-            "${stringResource(R.string.track_count, sorted.size)} · ${formatBytes(state.cacheBytes)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-
-        CollectionActions(
-            onPlay = { viewModel.play(queue, 0, source) },
-            onShuffle = { viewModel.shufflePlay(queue, source) },
-        )
-
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-            items(sorted, key = { it.fileId }) { track ->
+        item {
+            CollectionActions(
+                onPlay = { viewModel.play(queue, 0, source) },
+                onShuffle = { viewModel.shufflePlay(queue, source) },
+            )
+        }
+        if (sorted.isEmpty()) {
+            item {
+                Text(
+                    stringResource(R.string.no_downloaded_tracks_match, query),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+        }
+        items(sorted, key = { it.fileId }) { track ->
                 CachedTrackRow(
                     viewModel = viewModel,
                     track = track,
@@ -131,7 +152,6 @@ fun LibraryScreen(
                     onRemoveDownload = { viewModel.removeDownload(track.fileId) },
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            }
         }
     }
 }

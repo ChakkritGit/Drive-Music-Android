@@ -44,6 +44,7 @@ fun PlaylistsScreen(
     state: PlayerViewModel.UiState,
     viewModel: PlayerViewModel,
     query: String,
+    onQueryChange: (String) -> Unit,
     onOpen: (Collection) -> Unit,
 ) {
     var newName by remember { mutableStateOf("") }
@@ -54,7 +55,11 @@ fun PlaylistsScreen(
         else state.playlists.filter { it.name.lowercase().contains(normalized) }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        // Search and the create row are part of the scroll, so they move out of the way rather
+        // than holding a fixed slice of the screen.
+        item { SearchField(query, stringResource(R.string.search_playlists), onQueryChange) }
+        item {
         // Inline creation rather than a dialog behind a "+" — matches iOS, and making a playlist
         // is the thing this screen is for.
         Row(
@@ -76,15 +81,27 @@ fun PlaylistsScreen(
                 Text(stringResource(R.string.create))
             }
         }
+        }
 
         if (state.playlists.isEmpty()) {
-            EmptyState(
-                message = stringResource(R.string.no_playlists_yet_create_one_above_or_add_a_track_to_a_new_pl),
-            )
+            item {
+                Text(
+                    stringResource(R.string.no_playlists_yet_create_one_above_or_add_a_track_to_a_new_pl),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
         } else if (visible.isEmpty()) {
-            EmptyState(message = stringResource(R.string.no_playlists_match, query))
+            item {
+                Text(
+                    stringResource(R.string.no_playlists_match, query),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
         } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(visible, key = { it.id }) { playlist ->
                     val subtitle = trackCount(playlist.tracks.size)
                     PlaylistRow(
@@ -104,7 +121,6 @@ fun PlaylistsScreen(
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
-            }
         }
     }
 }

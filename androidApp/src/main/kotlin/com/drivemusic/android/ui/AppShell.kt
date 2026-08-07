@@ -256,12 +256,6 @@ private fun AppShellContent(
                     Pushed.Analytics -> AnalyticsScreen(state)
 
                     null -> Column(modifier = Modifier.fillMaxSize()) {
-                        // Every section is searchable on iOS, so the field belongs above the
-                        // content rather than inside each screen.
-                        if (tab != Tab.BROWSE) {
-                            SearchField(query, stringResource(R.string.search_your_music)) { query = it }
-                        }
-
                         AnimatedContent(
                             targetState = tab,
                             transitionSpec = {
@@ -270,9 +264,12 @@ private fun AppShellContent(
                             label = "tab",
                         ) { current ->
                             when (current) {
-                                Tab.HOME -> HomeScreen(state, viewModel, query) {
-                                    pushed = Pushed.CollectionDetail(it)
-                                }
+                                Tab.HOME -> HomeScreen(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    query = query,
+                                    onQueryChange = { query = it },
+                                ) { pushed = Pushed.CollectionDetail(it) }
 
                                 Tab.BROWSE -> BrowseScreen(
                                     drive = container.drive,
@@ -285,13 +282,19 @@ private fun AppShellContent(
                                     downloadProgress = state.downloadProgress,
                                 )
 
-                                Tab.PLAYLISTS -> PlaylistsScreen(state, viewModel, query) {
-                                    pushed = Pushed.CollectionDetail(it)
-                                }
+                                Tab.PLAYLISTS -> PlaylistsScreen(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    query = query,
+                                    onQueryChange = { query = it },
+                                ) { pushed = Pushed.CollectionDetail(it) }
 
-                                Tab.LIBRARY -> LibraryScreen(state, viewModel, query) {
-                                    addingToPlaylist = it
-                                }
+                                Tab.LIBRARY -> LibraryScreen(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    query = query,
+                                    onQueryChange = { query = it },
+                                ) { addingToPlaylist = it }
                             }
                         }
                     }
