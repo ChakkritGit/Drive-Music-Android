@@ -21,10 +21,12 @@ object TrackAnalyzer {
      * Bumped whenever anything here changes what a stored result would be, so old rows are
      * recomputed rather than silently believed.
      *
-     * 8 is the first version past iOS's 7: the onset gate and the interpolated tempo peak both
-     * change the numbers this produces, so results stored by 7 are not results this would produce.
+     * 8 was the first version past iOS's 7: the onset gate and the interpolated tempo peak both
+     * change the numbers this produces. 9 adds the loudness gain, which rows stored by 8 do not
+     * carry at all — and a missing gain reads as "leave this track alone", so without the bump
+     * every already-analysed track would silently opt out of normalisation forever.
      */
-    const val VERSION = 8
+    const val VERSION = 9
 
     /**
      * Everything except the spectral cutoff runs at this rate. Tempo, key and envelope all live
@@ -76,6 +78,53 @@ object TrackAnalyzer {
         val maximum = result.maxOrNull() ?: 0f
         return if (maximum > 0f) result.map { it / maximum } else result
     }
+
+    /**
+     * How loud the track is overall, as a gain that would bring it to [TARGET_RMS].
+     *
+     * RMS rather than peak: loudness is how much energy there is over time, and peak says only how
+     * close the loudest single sample came to clipping — a quiet track that happens to have one
+     * spike is not a loud track. Measured over the part that is actually sounding, so a long fade
+     * in or a silent tail does not drag the reading down and make the track come back too loud.
+     *
+     * Clamped: a gain large enough to rescue a very quiet recording would also amplify its noise
+     * floor into the foreground, and one small enough to tame a heavily limited master would make
+     * it audibly duller than the rest. Evening things out is worth more than getting all the way
+     * there.
+     */
+    fun loudnessGain(samples: FloatArray): Double? {
+        if (samples.isEmpty()) return null
+
+        var sum = 0.0
+        var counted = 0L
+        for (sample in samples) {
+            val magnitude = abs(sample)
+            // Below this is silence or a fade, not the track's level.
+            if (magnitude < SILENCE_FLOOR) continue
+            sum += sample.toDouble() * sample.toDouble()
+            counted++
+        }
+        if (counted == 0L) return null
+
+        val rms = sqrt(sum / counted)
+        if (rms <= 0.0) return null
+        return (TARGET_RMS / rms).coerceIn(MIN_GAIN, MAX_GAIN)
+    }
+
+    /**
+     * The level tracks are brought to, in linear amplitude — about -18 dBFS RMS.
+     *
+     * Below where most modern masters sit, so normalising usually turns things *down*. Turning
+     * down cannot clip; turning up can, and a target that pushed the average track upward would
+     * make the loudest ones distort.
+     */
+    private const val TARGET_RMS = 0.125
+
+    /** Roughly -60 dBFS. Below this a sample is not carrying the track's level. */
+    private const val SILENCE_FLOOR = 0.001f
+
+    private const val MIN_GAIN = 0.35
+    private const val MAX_GAIN = 3.0
 
     // MARK: - Onsets
 

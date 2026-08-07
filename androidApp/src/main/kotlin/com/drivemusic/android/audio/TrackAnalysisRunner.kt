@@ -26,6 +26,7 @@ object TrackAnalysisRunner {
         val waveform = TrackAnalyzer.envelope(samples)
         val tempo = TrackAnalyzer.tempoAndPhase(TrackAnalyzer.spectralFlux(samples))
         val key = TrackAnalyzer.detectKey(samples)
+        val gain = TrackAnalyzer.loudnessGain(samples)
 
         val mixIn = MixPoints.mixInPoint(
             envelope = waveform,
@@ -47,6 +48,7 @@ object TrackAnalysisRunner {
             mixOutSeconds = mixOut,
             durationSeconds = duration,
             spectralCutoffHz = cutoff,
+            loudnessGain = gain,
             waveform = waveform,
             version = TrackAnalyzer.VERSION,
         )

@@ -21,6 +21,13 @@ data class TrackAnalysis(
     val mixOutSeconds: Double? = null,
     val durationSeconds: Double? = null,
     val spectralCutoffHz: Double? = null,
+    /**
+     * A multiplier that brings this track to a common loudness, or null if it was not measured.
+     *
+     * 1 leaves the track alone. Applied to the slot's output, so it survives the transition
+     * automation writing new parameters underneath it.
+     */
+    val loudnessGain: Double? = null,
     val waveform: List<Float> = emptyList(),
     val version: Int,
 ) {

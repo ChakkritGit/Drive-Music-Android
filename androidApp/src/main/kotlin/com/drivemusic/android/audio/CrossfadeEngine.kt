@@ -57,6 +57,24 @@ class CrossfadeEngine(
     var activeSlot: PlaybackSlot = PlaybackSlot.A
         private set
 
+    /**
+     * Hands playback to [slot] without a transition — the gapless path, where the slot has already
+     * been prepared and simply has to become the one that counts.
+     *
+     * A method rather than a settable property: making `activeSlot` writable would let any caller
+     * change which slot is live without touching the filters, and the two must move together.
+     */
+    fun promoteToActive(slot: PlaybackSlot) {
+        if (slot == activeSlot) return
+        player(activeSlot).stop()
+        activeSlot = slot
+        processors.getValue(slot).parameters =
+            SlotParameters.open.copy(eq = eq).copy(spatialWet = spatialWet)
+        processors.getValue(slot.other).parameters =
+            SlotParameters.silent.copy(eq = eq).copy(spatialWet = spatialWet)
+        player(slot).play()
+    }
+
     var isTransitioning: Boolean = false
         private set
 
@@ -121,8 +139,12 @@ class CrossfadeEngine(
         return ExoPlayer.Builder(context, renderersFactory).build()
     }
 
-    fun prepare(slot: PlaybackSlot, uri: String) {
+    fun prepare(slot: PlaybackSlot, uri: String, loudnessGain: Double = 1.0) {
         val player = player(slot)
+        // Applied on the player rather than through the slot's parameters. The transition
+        // automation rewrites those several times a second, so a gain folded into them would be
+        // erased by the next tick — and it is a property of the track, not of the transition.
+        player.volume = loudnessGain.toFloat().coerceIn(0f, MAX_PLAYER_VOLUME)
         player.setMediaItem(MediaItem.fromUri(uri))
         player.prepare()
     }
@@ -265,6 +287,12 @@ class CrossfadeEngine(
     }
 
     companion object {
+        /**
+         * Media3 allows a player volume above 1, which is what makes normalising a quiet track
+         * upward possible at all — but it clips there like anything else, so it is bounded.
+         */
+        private const val MAX_PLAYER_VOLUME = 3f
+
         /** ~30Hz, matching the iOS ramp. */
         const val RAMP_INTERVAL_MS = 33L
     }

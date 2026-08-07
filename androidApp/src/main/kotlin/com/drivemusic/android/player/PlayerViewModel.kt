@@ -139,6 +139,10 @@ class PlayerViewModel(
      * [analyzeInBackground].
      */
     private val pendingAnalysis = ArrayDeque<CachedTrack>()
+
+    /** The track already loaded into the idle slot, waiting for the current one to end. */
+    private var armedGapless: Pair<Int, CachedTrack>? = null
+    private var isArmingGapless = false
     private var loadJob: Job? = null
 
     /** True while a transition has been started for the current track, so it fires only once. */
@@ -332,6 +336,19 @@ class PlayerViewModel(
         applySpatialAudio()
     }
 
+    /**
+     * The playback gain for one track: its measured loudness gain, or 1.
+     *
+     * 1 when normalisation is off, and 1 when the track has not been analysed yet — an unmeasured
+     * track is left exactly as it is rather than guessed at, so the worst case is that it is the
+     * odd one out rather than wrong.
+     */
+    private fun loudnessGainFor(fileId: String): Double {
+        val current = _state.value
+        if (!current.volumeNormalizationEnabled) return 1.0
+        return current.analyses[fileId]?.loudnessGain ?: 1.0
+    }
+
     private fun applySpatialAudio() {
         val current = _state.value
         engine.spatialWet = if (current.spatialAudioEnabled) current.spatialAudioIntensity else 0.0
@@ -369,11 +386,18 @@ class PlayerViewModel(
     fun setGaplessEnabled(enabled: Boolean) {
         settings.gaplessEnabled = enabled
         _state.update { it.copy(gaplessEnabled = enabled) }
+        if (!enabled) cancelGaplessArm()
     }
 
     fun setVolumeNormalizationEnabled(enabled: Boolean) {
         settings.volumeNormalizationEnabled = enabled
         _state.update { it.copy(volumeNormalizationEnabled = enabled) }
+        // Applied to what is already playing, not only to whatever loads next — a switch whose
+        // effect you cannot hear until the next track is a switch you cannot tell you have flipped.
+        val playing = _state.value.currentTrack?.id
+        if (playing != null) {
+            engine.player(engine.activeSlot).volume = loudnessGainFor(playing).toFloat()
+        }
     }
 
     fun setEq(eq: EqSettings) {
@@ -582,6 +606,10 @@ class PlayerViewModel(
      *   load is a fresh selection and starts at the top.
      */
     private fun loadCurrent(autoplay: Boolean, seekToMs: Long = 0) {
+        // Anything armed was armed for a handover that is no longer the one happening — a skip, a
+        // jump, or a new queue. Left in place it would fire at the end of the *new* track and play
+        // whatever was next before the change.
+        cancelGaplessArm()
         val file = _state.value.currentTrack ?: return
         loadJob?.cancel()
         transitionArmedFor = null
@@ -591,7 +619,7 @@ class PlayerViewModel(
             try {
                 val track = ensureCached(file)
                 val slot = engine.activeSlot
-                engine.prepare(slot, files.uri(track.relativeFilePath))
+                engine.prepare(slot, files.uri(track.relativeFilePath), loudnessGainFor(track.fileId))
                 val player = engine.player(slot)
                 if (seekToMs > 0) player.seekTo(seekToMs)
                 player.playWhenReady = autoplay
@@ -692,6 +720,7 @@ class PlayerViewModel(
                 _state.update { it.copy(positionMs = position, durationMs = duration) }
 
                 maybeStartTransition(position, duration)
+                maybeArmGapless(position, duration)
                 maybeAdvanceOnEnd(player, position, duration)
                 delay(250)
             }
@@ -750,7 +779,11 @@ class PlayerViewModel(
         viewModelScope.launch {
             val track = runCatching { ensureCached(nextFile) }.getOrNull() ?: return@launch
             if (engine.isTransitioning) return@launch
-            engine.prepare(engine.activeSlot.other, files.uri(track.relativeFilePath))
+            engine.prepare(
+                engine.activeSlot.other,
+                files.uri(track.relativeFilePath),
+                loudnessGainFor(track.fileId),
+            )
             engine.startTransition(plan) { promoted ->
                 onTransitionCommitted(nextIndex, track, promoted)
             }
@@ -784,6 +817,50 @@ class PlayerViewModel(
     }
 
     /** The plain hand-off, for when crossfade is off or a transition did not arm in time. */
+    /**
+     * Loads the next track into the idle slot before the current one ends.
+     *
+     * This is what "gapless" means here: the silence it removes is the time spent opening and
+     * buffering the next file, which happens *after* the current track has finished if nothing
+     * prepares it first. A player that is already prepared starts on the next buffer.
+     *
+     * Only when crossfade is off. A crossfade already prepares the incoming track — earlier, and
+     * with a curve — so arming a second handover underneath it would have two paths racing to
+     * advance the same queue.
+     */
+    private fun maybeArmGapless(positionMs: Long, durationMs: Long) {
+        val state = _state.value
+        if (!state.gaplessEnabled || state.crossfadeEnabled) return
+        if (engine.isTransitioning || durationMs <= 0 || !state.isPlaying) return
+        if (state.queue.loopMode == LoopMode.ONE) return
+        if (armedGapless != null || isArmingGapless) return
+        if (durationMs - positionMs > GAPLESS_ARM_LEAD_MS) return
+
+        val nextIndex = PlaybackQueue.peekNextIndex(state.queue) ?: return
+        val nextFile = state.queue.tracks.getOrNull(nextIndex) ?: return
+
+        isArmingGapless = true
+        viewModelScope.launch {
+            val track = runCatching { ensureCached(nextFile) }.getOrNull()
+            isArmingGapless = false
+            if (track == null || engine.isTransitioning) return@launch
+            // The queue may have moved while the file was being fetched, in which case what was
+            // armed is no longer what comes next.
+            if (PlaybackQueue.peekNextIndex(_state.value.queue) != nextIndex) return@launch
+            engine.prepare(
+                engine.activeSlot.other,
+                files.uri(track.relativeFilePath),
+                loudnessGainFor(track.fileId),
+            )
+            armedGapless = nextIndex to track
+        }
+    }
+
+    /** Drops anything armed — the queue moved, or the setting went off. */
+    private fun cancelGaplessArm() {
+        armedGapless = null
+    }
+
     private fun maybeAdvanceOnEnd(player: Player, positionMs: Long, durationMs: Long) {
         if (engine.isTransitioning || durationMs <= 0) return
         if (player.playbackState != Player.STATE_ENDED) return
@@ -794,7 +871,21 @@ class PlayerViewModel(
             return
         }
         _state.value.currentTrack?.let { trainOn(it, fraction = 1.0) }
+
+        val armed = armedGapless
+        if (armed != null && PlaybackQueue.peekNextIndex(_state.value.queue) == armed.first) {
+            armedGapless = null
+            startArmedGapless(armed.first, armed.second)
+            return
+        }
         next()
+    }
+
+    /** Hands over to the slot [maybeArmGapless] already prepared. */
+    private fun startArmedGapless(index: Int, track: CachedTrack) {
+        val slot = engine.activeSlot.other
+        engine.promoteToActive(slot)
+        onTransitionCommitted(index, track, slot)
     }
 
     // MARK: - Model and session
@@ -855,6 +946,14 @@ class PlayerViewModel(
          * would never have produced.
          */
         const val MAX_CROSSFADE_SECONDS = 12.0
+
+        /**
+         * How far before the end the next track is loaded for a gapless handover.
+         *
+         * Long enough to open and buffer a local file comfortably, short enough that a queue edit
+         * made while listening is unlikely to land inside the window and arm the wrong track.
+         */
+        const val GAPLESS_ARM_LEAD_MS = 10_000L
     }
 
     override fun onCleared() {
