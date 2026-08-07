@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -184,11 +183,11 @@ fun MiniPlayer(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     with(sharedScope) {
-                        Text(
+                        // The mini player has the least width of anywhere a title appears, so it
+                        // is where truncation hides the most — the same marquee runs here.
+                        MarqueeText(
                             state.metadata?.title ?: track.displayName,
                             style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.sharedBounds(
                                 rememberSharedContentState(TITLE_KEY),
                                 animatedVisibilityScope = animatedScope,
@@ -294,7 +293,7 @@ fun NowPlayingScreen(
                     // iOS sits this below a real navigation bar plus its own 16pt of vertical
                     // padding; here the header is a bare row of icon buttons, so without this the
                     // cover starts almost immediately under the status bar.
-                    .padding(top = 16.dp)
+                    .padding(top = 40.dp)
                     .fillMaxWidth(0.82f)
                     .aspectRatio(1f),
             )
@@ -307,17 +306,14 @@ fun NowPlayingScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 with(sharedScope) {
-                    Text(
+                    // Scrolls instead of truncating. A title is the one string on this screen the
+                    // reader may actually need in full, and "Gryffin & Illenium Ft. Daya - Feel…"
+                    // withholds exactly the part that distinguishes one upload from another.
+                    MarqueeText(
                         state.metadata?.title ?: track.displayName,
                         style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        // Scrolls instead of truncating, like the iOS marquee. A title is the one
-                        // string on this screen the reader may actually need in full, and
-                        // "Gryffin & Illenium Ft. Daya - Feel…" withholds exactly the part that
-                        // distinguishes one upload of a song from another.
                         modifier = Modifier
                             .weight(1f)
-                            .basicMarquee(iterations = Int.MAX_VALUE)
                             .sharedBounds(
                                 rememberSharedContentState(TITLE_KEY),
                                 animatedVisibilityScope = animatedScope,
@@ -366,7 +362,9 @@ fun NowPlayingScreen(
             }
         }
 
-        Column(modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp)) {
+        // Lifted off the title block: the slider is a control, and the three lines above it are
+        // what is playing. Flush together they read as one stack of rows.
+        Column(modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp).padding(top = 12.dp)) {
             Slider(
                 value = scrubbing ?: if (state.durationMs > 0) {
                     state.positionMs.toFloat() / state.durationMs
@@ -389,7 +387,7 @@ fun NowPlayingScreen(
         // iOS. The queue lives here rather than as a header action, and is disabled when there is
         // nothing after this track to look at.
         Row(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp),
+            modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp).padding(top = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (state.crossfadeEnabled && state.autoMixEnabled && state.isPlaying) {
