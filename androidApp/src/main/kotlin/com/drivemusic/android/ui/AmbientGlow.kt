@@ -9,14 +9,15 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
@@ -81,17 +82,24 @@ fun AmbientGlow(
 }
 
 /**
- * The cover again, scaled up and heavily blurred behind itself — a coloured shadow cast from the
- * artwork's own palette. Mirrors `NowPlayingView.artworkHalo`.
+ * The cover again, spread wider and blurred to a wash behind itself — a coloured shadow cast from
+ * the artwork's own palette. Mirrors `NowPlayingView.artworkHalo`.
  *
  * Only drawn when the glow is off. With the glow on, the glow already provides exactly this and
  * the two stack into mud; with it off there is nothing behind the cover at all and it sits flat on
  * the background.
  *
- * The blur is done by decoding the cover very small and letting the GPU stretch it back up, rather
- * than with `Modifier.blur` — that requires API 31 and this app runs from 26, and a real blur pass
- * over a large bitmap every frame is expensive for something whose whole purpose is to be
- * indistinct. A 24px thumbnail scaled up 20× is a blur, and it costs one bilinear filter.
+ * Blurred by drawing a handful of pixels across the whole area and letting the GPU interpolate,
+ * rather than by a blur pass. `Modifier.blur` needs API 31 and this app runs from 26, and a real
+ * blur over a large bitmap is expensive for something whose entire purpose is to be indistinct.
+ *
+ * The size is fixed at [HALO_PIXELS] rather than left to `inSampleSize`, which is relative to the
+ * source: a large cover sampled down by the same factor still keeps enough structure to be
+ * recognisable, and a recognisable copy sitting behind the original reads as a misprint rather
+ * than as light. Six pixels across cannot resemble anything.
+ *
+ * Centred, and with no rounded corner. Both were wrong for the same reason: a hard edge and an
+ * offset are how you notice that something is a *copy* of the cover. Light has neither.
  */
 @Composable
 fun ArtworkHalo(artwork: ByteArray?, size: Dp, modifier: Modifier = Modifier) {
@@ -101,18 +109,34 @@ fun ArtworkHalo(artwork: ByteArray?, size: Dp, modifier: Modifier = Modifier) {
         bitmap = thumbnail.asImageBitmap(),
         contentDescription = null,
         contentScale = ContentScale.Crop,
+        // Bilinear, so the six pixels become a gradient rather than six squares.
         filterQuality = FilterQuality.High,
         modifier = modifier
             .size(size)
             .graphicsLayer {
-                // Spread wider and pushed down, so the light reads as coming from *behind* the
-                // cover rather than as a fuzzy copy of it peeking out evenly on all sides.
-                scaleX = 1.22f
-                scaleY = 1.22f
-                translationY = 26.dp.toPx()
-                alpha = 0.95f
+                // Spread past the cover on every side, so what shows is only the spill.
+                scaleX = HALO_SPREAD
+                scaleY = HALO_SPREAD
+                alpha = 0.85f
+                // The fade below multiplies this layer's own alpha, which it needs a layer to
+                // multiply into.
+                compositingStrategy = CompositingStrategy.Offscreen
             }
-            .clip(RoundedCornerShape(10.dp)),
+            .drawWithContent {
+                drawContent()
+                // Faded to nothing at its edges. Blurring the colours was only half of it: a
+                // rectangle of soft colour is still a rectangle, and its boundary is exactly what
+                // gives away that there is an image back there rather than light.
+                drawRect(
+                    Brush.radialGradient(
+                        0.45f to Color.Black,
+                        1f to Color.Transparent,
+                        center = center,
+                        radius = size.toPx() / 2,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
     )
 }
 
@@ -136,22 +160,39 @@ private fun rememberAverageColor(artwork: ByteArray?): Color? = remember(artwork
     Color(pixel).copy(alpha = 1f)
 }
 
-/** A deliberately tiny decode of the cover — see [ArtworkHalo]. */
+/**
+ * The cover reduced to [HALO_PIXELS] square — see [ArtworkHalo].
+ *
+ * Sampled down by the decoder first so the full-size bitmap is never allocated, then scaled to an
+ * exact size, because `inSampleSize` is a ratio and this needs an absolute answer.
+ */
 @Composable
 private fun rememberThumbnail(artwork: ByteArray?): Bitmap? = remember(artwork) {
     val bytes = artwork ?: return@remember null
-    runCatching {
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, sampledOptions(HALO_SIZE))
-    }.getOrNull()
+    val sampled = runCatching {
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, sampledOptions(HALO_PIXELS))
+    }.getOrNull() ?: return@remember null
+    runCatching { Bitmap.createScaledBitmap(sampled, HALO_PIXELS, HALO_PIXELS, true) }
+        .getOrNull()
+        .also { if (it !== sampled) sampled.recycle() }
 }
 
 private fun sampledOptions(target: Int) = BitmapFactory.Options().apply {
     // Decoded at a fraction of full size. `inSampleSize` is honoured by the decoder itself, so the
     // full-size bitmap is never allocated at all.
+    // A ratio, not a size: it only has to get the decode down to something small before the exact
+    // scaling above. 32 turns any realistic cover into tens of pixels.
     inSampleSize = 32
     inPreferredConfig = Bitmap.Config.ARGB_8888
     inScaled = false
     if (target <= 1) inSampleSize = 64
 }
 
-private const val HALO_SIZE = 24
+/**
+ * How many pixels wide the halo's source is. Small enough that nothing in the cover survives as a
+ * shape — only its colours, in roughly the places they were.
+ */
+private const val HALO_PIXELS = 6
+
+/** How far past the cover the halo spreads. */
+private const val HALO_SPREAD = 1.35f

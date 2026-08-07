@@ -437,7 +437,10 @@ fun NowPlayingScreen(
             }
         }
 
-        TransportControls(state, viewModel)
+        // Set apart from the slider above it. The slider reports where the track is; these change
+        // what is playing. Flush together they read as one block of controls, and the play button
+        // is the one thing on this screen that should be unmissable.
+        TransportControls(state, viewModel, modifier = Modifier.padding(top = 16.dp))
 
         // Utility row: what is happening on one side, what you can do on the other — matching
         // iOS. The queue lives here rather than as a header action, and is disabled when there is
@@ -529,7 +532,11 @@ private fun MixBadge(bpm: Double?) {
  * actually have. All five clear the 44dp minimum touch target.
  */
 @Composable
-private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
+private fun TransportControls(
+    state: PlayerViewModel.UiState,
+    viewModel: PlayerViewModel,
+    modifier: Modifier = Modifier,
+) {
     // Whether the mix engine is set up for this track. Crossfade is checked as well as Auto mix
     // because Auto mix alone does nothing — it shapes a crossfade rather than being a transition of
     // its own. Deliberately not gated on `isPlaying`: the glow uses this so it stays mounted across
@@ -538,6 +545,7 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
     val isMixReady = state.crossfadeEnabled && state.autoMixEnabled && state.currentTrack != null
 
     Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
