@@ -9,14 +9,14 @@ Scaffold plus the first slice of shared logic. Builds and passes on every target
 
 | Task | Result |
 | --- | --- |
-| `:shared:testDebugUnitTest` | 59 tests, 0 failures |
-| `:shared:iosSimulatorArm64Test` | 59 tests, 0 failures |
+| `:shared:testDebugUnitTest` | 84 tests, 0 failures |
+| `:shared:iosSimulatorArm64Test` | 84 tests, 0 failures |
 | `:androidApp:testDebugUnitTest` | 29 tests, 0 failures |
 | `:androidApp:connectedDebugAndroidTest` | 5 tests, 0 failures (emulator, API 36) |
 | `:shared:linkReleaseFrameworkIosArm64` | `DriveMusicShared.framework` produced |
 | `:androidApp:assembleDebug` | APK produced |
 
-The 59 shared tests run on both the Android and iOS targets from `commonTest`, which is the point
+The 84 shared tests run on both the Android and iOS targets from `commonTest`, which is the point
 — the shared logic is verified on each platform that will actually run it, not just on one.
 
 ## Why the split is where it is
@@ -62,6 +62,13 @@ tests ported alongside it:
 - `transition/` — `TransitionCurve`, `TransitionShape`, the four presets, and `TransitionPlan`:
   the whole of what a transition *is*, which is the highest-value thing in the codebase to have
   exactly one copy of
+- `playback/PlaybackQueue` — what is playing and what plays next, as a pure state machine. On iOS
+  this lives as mutable properties tangled with the audio engine, the download cache and the
+  now-playing surface, and almost every playback bug found in that codebase lived here rather than
+  in the audio: a queued track that never played, an Up Next list that re-randomised itself, a
+  shuffle window that topped up by one instead of twenty. None of those need an audio engine to
+  reproduce, and none were caught, because there was nowhere to test them without one. Here every
+  operation is a function from state to state and all 25 rules are covered.
 
 These carry across fixes made on the iOS side, deliberately, so the two do not drift:
 
