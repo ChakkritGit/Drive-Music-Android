@@ -94,7 +94,7 @@ fun PlaylistsScreen(
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         // Search and the create row are part of the scroll, so they move out of the way rather
         // than holding a fixed slice of the screen.
-        item { SearchField(query, stringResource(R.string.search_playlists), onChange = onQueryChange) }
+        item { SearchBar(query, stringResource(R.string.search_playlists), onChange = onQueryChange) }
         item {
             // A button, not a permanently open text field. Creating a playlist happens once in a
             // while; the field sat there empty the rest of the time, taking a row of a list whose

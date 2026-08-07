@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.res.stringResource
+import com.drivemusic.android.R
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3Api
 
@@ -196,6 +198,65 @@ fun SearchField(
                     inner()
                 },
             )
+        }
+    }
+}
+
+/**
+ * A [SearchField] with the clear button that belongs beside it.
+ *
+ * Every search field in the app gets the same one. Typing a query and then backspacing it out a
+ * character at a time is the same annoyance wherever it happens, and a control that appears on one
+ * screen but not another teaches people it is not there at all.
+ *
+ * Beside the field rather than inside it: inside, it is a third icon competing with the magnifier
+ * and the text for one control's width, and it shrinks the field exactly when the field has the
+ * most in it. It appears only once there is something to clear.
+ */
+@Composable
+fun SearchBar(
+    value: String,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    fieldModifier: Modifier = Modifier,
+    contentPadding: Dp = 16.dp,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions =
+        androidx.compose.foundation.text.KeyboardOptions.Default,
+    keyboardActions: androidx.compose.foundation.text.KeyboardActions =
+        androidx.compose.foundation.text.KeyboardActions.Default,
+    onChange: (String) -> Unit,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = contentPadding),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SearchField(
+            value = value,
+            placeholder = placeholder,
+            modifier = fieldModifier.weight(1f),
+            contentPadding = 0.dp,
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            onChange = onChange,
+        )
+        // The button grows out of the trailing edge and the field, being weighted, gives up
+        // exactly that width — so the pill contracts and expands rather than jumping between two
+        // sizes a frame apart.
+        androidx.compose.animation.AnimatedVisibility(
+            visible = value.isNotEmpty(),
+            enter = androidx.compose.animation.expandHorizontally(
+                androidx.compose.animation.core.tween(180)
+            ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)),
+            exit = androidx.compose.animation.shrinkHorizontally(
+                androidx.compose.animation.core.tween(180)
+            ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)),
+        ) {
+            androidx.compose.material3.IconButton(onClick = { onChange("") }) {
+                Icon(
+                    painterResource(AppIcons.Close),
+                    contentDescription = stringResource(R.string.clear),
+                )
+            }
         }
     }
 }

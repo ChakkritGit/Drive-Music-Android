@@ -198,34 +198,17 @@ private fun AppShellContent(
                     if (pushed == Pushed.Search) {
                         // Field and clear button share the title slot rather than sitting on
                         // opposite sides of the bar's title/actions boundary — that boundary
-                        // reserves its own spacing, which is what pushed them apart and shoved
-                        // the button into the screen edge.
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            SearchField(
-                                value = query,
-                                placeholder = stringResource(R.string.search_your_music),
-                                modifier = Modifier.weight(1f).focusRequester(searchFocus),
-                                contentPadding = 0.dp,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                                onChange = { query = it },
-                            )
-                            // The button grows out of the trailing edge and the field gives up
-                            // exactly that width, so the pill visibly contracts and expands rather
-                            // than jumping between two sizes a frame apart.
-                            AnimatedVisibility(
-                                visible = query.isNotEmpty(),
-                                enter = expandHorizontally(tween(180)) + fadeIn(tween(180)),
-                                exit = shrinkHorizontally(tween(180)) + fadeOut(tween(120)),
-                            ) {
-                                IconButton(onClick = { query = "" }) {
-                                    Icon(
-                                        painterResource(AppIcons.Close),
-                                        contentDescription = stringResource(R.string.clear),
-                                    )
-                                }
-                            }
-                        }
+                        // reserves its own spacing, which would push them apart and shove the
+                        // button into the screen edge. Same control every other screen uses.
+                        SearchBar(
+                            value = query,
+                            placeholder = stringResource(R.string.search_your_music),
+                            fieldModifier = Modifier.focusRequester(searchFocus),
+                            contentPadding = 0.dp,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                            onChange = { query = it },
+                        )
                     } else if (pushed == null && tab == Tab.HOME) {
                         SearchButton(
                             placeholder = stringResource(R.string.search_your_music),

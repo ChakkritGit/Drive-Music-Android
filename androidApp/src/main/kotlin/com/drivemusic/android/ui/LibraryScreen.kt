@@ -87,7 +87,7 @@ fun LibraryScreen(
 
     if (state.cachedTracks.isEmpty()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            SearchField(query, stringResource(R.string.search_downloaded_tracks), onChange = onQueryChange)
+            SearchBar(query, stringResource(R.string.search_downloaded_tracks), onChange = onQueryChange)
             EmptyState(
                 title = stringResource(R.string.library_empty),
                 message = stringResource(R.string.library_empty_detail),
@@ -100,7 +100,7 @@ fun LibraryScreen(
         // Everything above the tracks is part of the scroll, so the search field and the header
         // move out of the way as you go down the list rather than holding a fixed slice of the
         // screen forever.
-        item { SearchField(query, stringResource(R.string.search_downloaded_tracks), onChange = onQueryChange) }
+        item { SearchBar(query, stringResource(R.string.search_downloaded_tracks), onChange = onQueryChange) }
         item {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),

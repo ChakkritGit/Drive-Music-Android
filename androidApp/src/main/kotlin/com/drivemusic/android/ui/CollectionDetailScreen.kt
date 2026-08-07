@@ -71,7 +71,7 @@ fun CollectionDetailScreen(
                 )
             }
             item { DownloadAllRow(remaining, progress) { viewModel.downloadAll(collection.tracks) } }
-            item { SearchField(query, stringResource(R.string.search_this_collection)) { query = it } }
+            item { SearchBar(query, stringResource(R.string.search_this_collection)) { query = it } }
         }
 
         when {
