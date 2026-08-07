@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings this app needs that the iOS catalog has no entry for. Translated rather
+     than left in English: a half-translated interface is worse than an untranslated
+     one, because the reader cannot tell which parts they are failing to find. -->
+<resources>
+    <string name="connect_google_drive">เชื่อมต่อ Google Drive</string>
+    <string name="connecting">กำลังเชื่อมต่อ…</string>
+    <string name="waiting_for_permission">กำลังรอการอนุญาต…</string>
+    <string name="try_again">ลองอีกครั้ง</string>
+    <string name="sign_in_prompt">ลงชื่อเข้าใช้เพื่อเล่นเพลงใน Google Drive ของคุณ</string>
+    <string name="back">ย้อนกลับ</string>
+    <string name="close">ปิด</string>
+    <string name="more">เพิ่มเติม</string>
+    <string name="pause">หยุดชั่วคราว</string>
+    <string name="previous">ก่อนหน้า</string>
+    <string name="repeat">เล่นซ้ำ</string>
+    <string name="favourite">รายการโปรด</string>
+    <string name="favourites">รายการโปรด</string>
+    <string name="downloaded">ดาวน์โหลดแล้ว</string>
+    <string name="all_downloaded">ดาวน์โหลดครบแล้ว</string>
+    <string name="remove_download">ลบไฟล์ที่ดาวน์โหลด</string>
+    <string name="delete_playlist">ลบเพลย์ลิสต์</string>
+    <string name="storage">พื้นที่จัดเก็บ</string>
+    <string name="storage_used">พื้นที่ที่ใช้</string>
+    <string name="downloaded_tracks">เพลงที่ดาวน์โหลด</string>
+    <string name="recently_played_sources">ที่มาที่เล่นล่าสุด</string>
+    <string name="most_played_sources">ที่มาที่เล่นบ่อยที่สุด</string>
+    <string name="unknown_artist">ไม่ทราบศิลปิน</string>
+    <string name="now_playing_label">กำลังเล่น</string>
+    <string name="nothing_queued">ไม่มีเพลงถัดจากเพลงนี้ในคิว</string>
+    <string name="library_empty">คลังเพลงของคุณว่างเปล่า</string>
+    <string name="library_empty_detail">ทุกเพลงที่คุณเล่นจาก Drive จะถูกดาวน์โหลดและเก็บไว้ที่นี่สำหรับฟังออฟไลน์</string>
+    <string name="no_matches">ไม่พบรายการที่ตรงกัน</string>
+    <string name="nothing_here">ยังไม่มีอะไรที่นี่</string>
+    <string name="collection_empty">คอลเลกชันนี้ไม่มีเพลง</string>
+    <string name="picked_from_what_you_play">เลือกจากเพลงที่คุณเล่น</string>
+    <string name="could_not_load_folder">โหลดโฟลเดอร์นี้ไม่สำเร็จ</string>
+    <string name="nothing_playable_here">ไม่มีเพลงที่เล่นได้ในโฟลเดอร์นี้</string>
+    <string name="playback_failed">เล่นเพลงไม่สำเร็จ</string>
+    <string name="drive_auth_required">ต้องได้รับสิทธิ์เข้าถึง Drive ก่อน</string>
+    <string name="crossfade_detail">ผสมเพลงหนึ่งเข้ากับเพลงถัดไปแทนการตัดจบ</string>
+    <string name="auto_mix_detail">ทำครอสเฟดเป็นการสลับเบสแบบดีเจ แทนการหรี่เสียงธรรมดา</string>
+    <string name="gapless_detail">เริ่มเพลงถัดไปทันทีที่เพลงนี้จบ</string>
+    <string name="normalization_detail">ปรับระดับเสียงเพลงที่มาสเตอร์มาไม่เท่ากันให้สม่ำเสมอ</string>
+    <string name="eq_detail">ปรับโทนเสียง เบส กลาง แหลม</string>
+    <string name="reset_to_flat">รีเซ็ตเป็นค่ากลาง</string>
+    <string name="clear_all_data_detail">ลบเพลงที่ดาวน์โหลด เพลย์ลิสต์ และประวัติการฟังทั้งหมดออกจากเครื่องนี้ ไม่มีอะไรใน Google Drive ของคุณถูกแตะต้อง</string>
+    <string name="delete_everything">ลบทั้งหมด</string>
+    <string name="clear_all_data_confirm">เพลงที่ดาวน์โหลด เพลย์ลิสต์ และประวัติการฟังจะถูกลบออกจากเครื่องนี้ การกระทำนี้ย้อนกลับไม่ได้</string>
+    <string name="add_to_playlist_action">เพิ่มไปยังเพลย์ลิสต์</string>
+    <string name="play_next_action">เล่นถัดไป</string>
+    <string name="search_home">ค้นหาเพลงของคุณ…</string>
+    <string name="track_count">%1$d เพลง</string>
+    <string name="nothing_to_show_yet">ยังไม่มีอะไรจะแสดง</string>
+    <string name="head_to_browse">ไปที่แท็บเรียกดูเพื่อเล่นเพลงจาก Drive ของคุณ</string>
+    <string name="no_playlists_detail">สร้างด้านบน หรือเพิ่มเพลงลงเพลย์ลิสต์ใหม่จากแท็บเรียกดู</string>
+    <string name="name_field">ชื่อ</string>
+</resources>

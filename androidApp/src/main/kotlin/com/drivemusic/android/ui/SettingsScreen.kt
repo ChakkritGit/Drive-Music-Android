@@ -23,7 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.drivemusic.android.R
 import com.drivemusic.android.audio.EqSettings
 import com.drivemusic.android.player.PlayerViewModel
 import kotlin.math.roundToInt
@@ -35,75 +37,75 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
     ) {
-        SettingsSection("Transitions")
+        SettingsSection(stringResource(R.string.transitions))
         SettingsGroup {
         SwitchRow(
-            title = "Crossfade",
-            subtitle = "Blend one track into the next instead of cutting",
+            title = stringResource(R.string.crossfade),
+            subtitle = stringResource(R.string.crossfade_detail),
             checked = state.crossfadeEnabled,
             onChange = viewModel::setCrossfadeEnabled,
         )
         if (state.crossfadeEnabled) {
             SliderRow(
-                title = "Length",
+                title = stringResource(R.string.length),
                 value = state.crossfadeSeconds.toFloat(),
                 range = 2f..20f,
                 display = "${state.crossfadeSeconds.roundToInt()}s",
                 onChange = { viewModel.setCrossfadeSeconds(it.toDouble()) },
             )
             SwitchRow(
-                title = "Auto mix",
-                subtitle = "Shape the crossfade as a DJ-style bass swap rather than a plain fade",
+                title = stringResource(R.string.auto_mix),
+                subtitle = stringResource(R.string.auto_mix_detail),
                 checked = state.autoMixEnabled,
                 onChange = viewModel::setAutoMixEnabled,
             )
         }
         SettingsDivider(startInset = 16.dp)
         SwitchRow(
-            title = "Gapless",
-            subtitle = "Start the next track the instant this one ends",
+            title = stringResource(R.string.gapless_playback),
+            subtitle = stringResource(R.string.gapless_detail),
             checked = state.gaplessEnabled,
             onChange = viewModel::setGaplessEnabled,
         )
         }
 
-        SettingsSection("Sound")
+        SettingsSection(stringResource(R.string.sound))
         SettingsGroup {
         SwitchRow(
-            title = "Volume normalization",
-            subtitle = "Even out tracks mastered at different levels",
+            title = stringResource(R.string.volume_normalization),
+            subtitle = stringResource(R.string.normalization_detail),
             checked = state.volumeNormalizationEnabled,
             onChange = viewModel::setVolumeNormalizationEnabled,
         )
         SettingsDivider(startInset = 16.dp)
         SwitchRow(
-            title = "Equalizer",
-            subtitle = "Bass, mid and treble tone controls",
+            title = stringResource(R.string.equalizer),
+            subtitle = stringResource(R.string.eq_detail),
             checked = state.eq.enabled,
             onChange = { viewModel.setEq(state.eq.copy(enabled = it)) },
         )
         if (state.eq.enabled) {
-            EqBand("Bass", state.eq.bassDb) { viewModel.setEq(state.eq.copy(bassDb = it)) }
-            EqBand("Mid", state.eq.midDb) { viewModel.setEq(state.eq.copy(midDb = it)) }
-            EqBand("Treble", state.eq.trebleDb) { viewModel.setEq(state.eq.copy(trebleDb = it)) }
+            EqBand(stringResource(R.string.bass), state.eq.bassDb) { viewModel.setEq(state.eq.copy(bassDb = it)) }
+            EqBand(stringResource(R.string.mid), state.eq.midDb) { viewModel.setEq(state.eq.copy(midDb = it)) }
+            EqBand(stringResource(R.string.treble), state.eq.trebleDb) { viewModel.setEq(state.eq.copy(trebleDb = it)) }
             Row(modifier = Modifier.padding(horizontal = 16.dp)) {
                 TextButton(onClick = {
                     viewModel.setEq(state.eq.copy(bassDb = 0.0, midDb = 0.0, trebleDb = 0.0))
-                }) { Text("Reset to flat") }
+                }) { Text(stringResource(R.string.reset_to_flat)) }
             }
         }
         }
 
-        SettingsSection("Storage")
+        SettingsSection(stringResource(R.string.storage))
         SettingsGroup {
             Text(
-                "${state.cachedTracks.size} tracks downloaded · ${formatBytes(state.cacheBytes)}",
+                "${stringResource(R.string.track_count, state.cachedTracks.size)} · ${formatBytes(state.cacheBytes)}",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(16.dp),
             )
         }
 
-        SettingsSection("Danger zone")
+        SettingsSection(stringResource(R.string.danger_zone))
         Row(modifier = Modifier.padding(16.dp)) {
             Button(
                 onClick = { confirmingWipe = true },
@@ -111,11 +113,10 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 ),
-            ) { Text("Clear all data") }
+            ) { Text(stringResource(R.string.clear_all_data)) }
         }
         Text(
-            "Removes every download, playlist and listening history from this device. " +
-                "Nothing in your Google Drive is touched.",
+            stringResource(R.string.clear_all_data_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 32.dp),
@@ -125,8 +126,8 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
     if (confirmingWipe) {
         AlertDialog(
             onDismissRequest = { confirmingWipe = false },
-            title = { Text("Clear all data?") },
-            text = { Text("Downloads, playlists and listening history will be deleted from this device. This cannot be undone.") },
+            title = { Text(stringResource(R.string.clear_all_data_2)) },
+            text = { Text(stringResource(R.string.clear_all_data_confirm)) },
             confirmButton = {
                 Button(
                     onClick = { viewModel.clearAllData(); confirmingWipe = false },
@@ -134,9 +135,9 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError,
                     ),
-                ) { Text("Delete everything") }
+                ) { Text(stringResource(R.string.delete_everything)) }
             },
-            dismissButton = { TextButton(onClick = { confirmingWipe = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmingWipe = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }

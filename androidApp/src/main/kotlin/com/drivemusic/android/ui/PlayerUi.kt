@@ -58,12 +58,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import android.graphics.BitmapFactory
+import com.drivemusic.android.R
 import com.drivemusic.android.player.PlayerViewModel
 import com.drivemusic.shared.model.LoopMode
 
@@ -75,11 +77,11 @@ fun CollectionActions(onPlay: () -> Unit, onShuffle: () -> Unit) {
     ) {
         Button(onClick = onPlay) {
             Icon(Icons.Default.PlayArrow, contentDescription = null)
-            Text("Play", modifier = Modifier.padding(start = 4.dp))
+            Text(stringResource(R.string.play), modifier = Modifier.padding(start = 4.dp))
         }
         OutlinedButton(onClick = onShuffle) {
             Icon(Icons.Default.Shuffle, contentDescription = null)
-            Text("Shuffle", modifier = Modifier.padding(start = 4.dp))
+            Text(stringResource(R.string.shuffle), modifier = Modifier.padding(start = 4.dp))
         }
     }
 }
@@ -174,11 +176,11 @@ fun MiniPlayer(
                 IconButton(onClick = viewModel::togglePlayPause) {
                     Icon(
                         if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (state.isPlaying) "Pause" else "Play",
+                        contentDescription = stringResource(if (state.isPlaying) R.string.pause else R.string.play),
                     )
                 }
                 IconButton(onClick = viewModel::next) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "Next")
+                    Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.next))
                 }
             }
         }
@@ -215,11 +217,11 @@ fun NowPlayingScreen(
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Close")
+                Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.close))
             }
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                "Now Playing",
+                stringResource(R.string.now_playing),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -257,7 +259,7 @@ fun NowPlayingScreen(
                 IconButton(onClick = { viewModel.toggleFavorite(track) }) {
                     Icon(
                         if (state.isCurrentFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Favourite",
+                        contentDescription = stringResource(R.string.favourite),
                         tint = if (state.isCurrentFavorite) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.outline,
                     )
@@ -279,7 +281,7 @@ fun NowPlayingScreen(
 
             state.source?.let {
                 Text(
-                    "Playing from ${it.name}",
+                    stringResource(R.string.playing_from, it.name),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                     maxLines = 1,
@@ -316,7 +318,7 @@ fun NowPlayingScreen(
             IconButton(onClick = { queueOpen = true }, enabled = state.upNext.isNotEmpty()) {
                 Icon(
                     Icons.AutoMirrored.Filled.List,
-                    contentDescription = "Queue",
+                    contentDescription = stringResource(R.string.queue),
                     tint = MaterialTheme.colorScheme.outline,
                 )
             }
@@ -344,7 +346,7 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
         IconButton(onClick = viewModel::toggleShuffle, modifier = Modifier.size(44.dp)) {
             Icon(
                 Icons.Default.Shuffle,
-                contentDescription = "Shuffle",
+                contentDescription = stringResource(R.string.shuffle),
                 tint = if (state.queue.shuffle) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.outline,
             )
@@ -354,7 +356,7 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
             enabled = state.currentTrack != null,
             modifier = Modifier.size(52.dp),
         ) {
-            Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(34.dp))
+            Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.prev), modifier = Modifier.size(34.dp))
         }
 
         Box(
@@ -369,7 +371,7 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
             ) {
                 Icon(
                     if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (state.isPlaying) "Pause" else "Play",
+                    contentDescription = stringResource(if (state.isPlaying) R.string.pause else R.string.play),
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(38.dp),
                 )
@@ -381,12 +383,12 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
             enabled = state.currentTrack != null,
             modifier = Modifier.size(52.dp),
         ) {
-            Icon(Icons.Default.SkipNext, contentDescription = "Next", modifier = Modifier.size(34.dp))
+            Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.next), modifier = Modifier.size(34.dp))
         }
         IconButton(onClick = viewModel::cycleLoopMode, modifier = Modifier.size(44.dp)) {
             Icon(
                 if (state.queue.loopMode == LoopMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                contentDescription = "Repeat",
+                contentDescription = stringResource(R.string.repeat),
                 tint = if (state.queue.loopMode == LoopMode.OFF) MaterialTheme.colorScheme.outline
                 else MaterialTheme.colorScheme.primary,
             )
@@ -409,7 +411,7 @@ private fun QueueSheet(
         LazyColumn(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             item {
                 Text(
-                    "Queue",
+                    stringResource(R.string.queue),
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
@@ -418,7 +420,8 @@ private fun QueueSheet(
             state.currentTrack?.let { current ->
                 item {
                     Text(
-                        state.source?.let { "Playing from ${it.name}" } ?: "Now playing",
+                        state.source?.let { stringResource(R.string.playing_from, it.name) }
+                            ?: stringResource(R.string.now_playing_label),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -439,7 +442,7 @@ private fun QueueSheet(
             if (state.upNext.isEmpty()) {
                 item {
                     Text(
-                        "Nothing queued after this track.",
+                        stringResource(R.string.nothing_queued),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.padding(16.dp),
@@ -448,7 +451,7 @@ private fun QueueSheet(
             } else {
                 item {
                     Text(
-                        "Next up",
+                        stringResource(R.string.next_up),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -461,7 +464,7 @@ private fun QueueSheet(
                         onClick = { viewModel.jumpTo(entry.index); onDismiss() },
                         onQueue = { viewModel.removeFromQueue(entry.index) },
                         queueIcon = Icons.Default.Close,
-                        queueLabel = "Remove from queue",
+                        queueLabel = stringResource(R.string.remove_from_queue),
                     )
                 }
             }

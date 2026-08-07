@@ -33,8 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.drivemusic.android.R
 import com.drivemusic.android.player.PlayerViewModel
 import com.drivemusic.shared.model.DriveFile
 import com.drivemusic.shared.model.PlaySource
@@ -65,7 +67,7 @@ fun PlaylistsScreen(
             OutlinedTextField(
                 value = newName,
                 onValueChange = { newName = it },
-                placeholder = { Text("New playlist name…") },
+                placeholder = { Text(stringResource(R.string.new_playlist_name)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
@@ -74,20 +76,21 @@ fun PlaylistsScreen(
                 enabled = newName.isNotBlank(),
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
-                Text("Create")
+                Text(stringResource(R.string.create))
             }
         }
 
         if (state.playlists.isEmpty()) {
             EmptyState(
-                "No playlists yet",
-                "Create one above, or add a track to a new playlist from Browse.",
+                stringResource(R.string.no_playlists_yet),
+                stringResource(R.string.no_playlists_detail),
             )
         } else if (visible.isEmpty()) {
-            EmptyState("No matches", "No playlists match \"$query\".")
+            EmptyState(stringResource(R.string.no_matches), stringResource(R.string.no_playlists_match, query))
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(visible, key = { it.id }) { playlist ->
+                    val subtitle = trackCount(playlist.tracks.size)
                     PlaylistRow(
                         viewModel = viewModel,
                         playlist = playlist,
@@ -95,7 +98,7 @@ fun PlaylistsScreen(
                             onOpen(
                                 Collection(
                                     playlist.name,
-                                    trackCount(playlist.tracks.size),
+                                    subtitle,
                                     playlist.tracks,
                                     PlaySource(playlist.id, playlist.name, PlaySource.Kind.PLAYLIST),
                                 )
@@ -139,7 +142,7 @@ private fun PlaylistRow(
             )
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = "Delete playlist")
+            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_playlist))
         }
     }
 }
@@ -155,15 +158,15 @@ fun NameDialog(title: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit
                 value = name,
                 onValueChange = { name = it },
                 singleLine = true,
-                label = { Text("Name") },
+                label = { Text(stringResource(R.string.name_field)) },
             )
         },
         confirmButton = {
             Button(onClick = { onConfirm(name.trim()) }, enabled = name.isNotBlank()) {
-                Text("Create")
+                Text(stringResource(R.string.create))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
@@ -179,29 +182,29 @@ fun AddToPlaylistDialog(
     var creating by remember { mutableStateOf(false) }
 
     if (creating) {
-        NameDialog("New playlist", { creating = false }) { onCreate(it); creating = false; onDismiss() }
+        NameDialog(stringResource(R.string.new_playlist), { creating = false }) { onCreate(it); creating = false; onDismiss() }
         return
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add to playlist") },
+        title = { Text(stringResource(R.string.add_to_playlist)) },
         text = {
             Column {
                 if (playlists.isEmpty()) {
-                    Text("No playlists yet.")
+                    Text(stringResource(R.string.no_playlists_yet))
                 } else {
                     playlists.forEach { playlist ->
                         ListItem(
                             headlineContent = { Text(playlist.name) },
-                            supportingContent = { Text("${playlist.tracks.size} tracks") },
+                            supportingContent = { Text(trackCount(playlist.tracks.size)) },
                             modifier = Modifier.clickable { onPick(playlist.id); onDismiss() },
                         )
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { creating = true }) { Text("New playlist") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = { creating = true }) { Text(stringResource(R.string.new_playlist)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

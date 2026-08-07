@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import coil.compose.AsyncImage
+import com.drivemusic.android.R
 import com.drivemusic.android.AppContainer
 import com.drivemusic.android.player.PlayerViewModel
 import com.drivemusic.shared.model.DriveFile
@@ -64,11 +66,11 @@ import com.drivemusic.shared.model.DriveFile
  * Putting it in the bottom bar gives a rarely-used screen the same weight as the four the app is
  * actually for.
  */
-enum class Tab(val label: String, val icon: ImageVector) {
-    HOME("Home", Icons.Default.Home),
-    BROWSE("Browse", Icons.Default.Folder),
-    PLAYLISTS("Playlists", Icons.Default.PlaylistPlay),
-    LIBRARY("Library", Icons.Default.LibraryMusic),
+enum class Tab(@androidx.annotation.StringRes val labelRes: Int, val icon: ImageVector) {
+    HOME(R.string.home, Icons.Default.Home),
+    BROWSE(R.string.browse, Icons.Default.Folder),
+    PLAYLISTS(R.string.playlists, Icons.Default.PlaylistPlay),
+    LIBRARY(R.string.library, Icons.Default.LibraryMusic),
 }
 
 /** What is pushed on top of the current tab. */
@@ -164,9 +166,9 @@ private fun AppShellContent(
 
     val pushedTitle = when (pushed) {
         is Pushed.CollectionDetail -> (pushed as Pushed.CollectionDetail).collection.title
-        Pushed.Settings -> "Settings"
-        Pushed.Profile -> "Profile"
-        Pushed.Analytics -> "Analytics"
+        Pushed.Settings -> stringResource(R.string.settings)
+        Pushed.Profile -> stringResource(R.string.profile)
+        Pushed.Analytics -> stringResource(R.string.analytics)
         null -> null
     }
 
@@ -174,11 +176,11 @@ private fun AppShellContent(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(pushedTitle ?: tab.label, maxLines = 1) },
+                title = { Text(pushedTitle ?: stringResource(tab.labelRes), maxLines = 1) },
                 navigationIcon = {
                     if (pushed != null) {
                         IconButton(onClick = { pushed = null }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
                     } else {
                         IconButton(onClick = { pushed = Pushed.Profile }) { ProfileAvatar(container) }
@@ -189,10 +191,10 @@ private fun AppShellContent(
                     // the bar belongs to that screen.
                     if (pushed == null) {
                         IconButton(onClick = { pushed = Pushed.Analytics }) {
-                            Icon(Icons.Default.Insights, contentDescription = "Analytics")
+                            Icon(Icons.Default.Insights, contentDescription = stringResource(R.string.analytics))
                         }
                         IconButton(onClick = { pushed = Pushed.Settings }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
                         }
                     }
                 },
@@ -209,8 +211,10 @@ private fun AppShellContent(
                             // destination, and landing on a detail screen belonging to a different
                             // section would be the wrong place.
                             onClick = { tab = entry; pushed = null; query = "" },
-                            icon = { Icon(entry.icon, contentDescription = entry.label) },
-                            label = { Text(entry.label) },
+                            icon = {
+                                Icon(entry.icon, contentDescription = stringResource(entry.labelRes))
+                            },
+                            label = { Text(stringResource(entry.labelRes)) },
                         )
                     }
                 }
@@ -250,7 +254,7 @@ private fun AppShellContent(
                         // Every section is searchable on iOS, so the field belongs above the
                         // content rather than inside each screen.
                         if (tab != Tab.BROWSE) {
-                            SearchField(query, "Search ${tab.label.lowercase()}") { query = it }
+                            SearchField(query, stringResource(R.string.search_your_music)) { query = it }
                         }
 
                         AnimatedContent(
@@ -306,14 +310,14 @@ private fun ProfileAvatar(container: AppContainer) {
         if (account?.pictureUrl != null) {
             AsyncImage(
                 model = account.pictureUrl,
-                contentDescription = "Profile",
+                contentDescription = stringResource(R.string.profile),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
             Icon(
                 Icons.Default.AccountCircle,
-                contentDescription = "Profile",
+                contentDescription = stringResource(R.string.profile),
                 tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.fillMaxSize(),
             )

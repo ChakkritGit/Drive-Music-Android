@@ -35,10 +35,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.drivemusic.android.R
 import com.drivemusic.shared.drive.DriveApiClient
 import com.drivemusic.shared.model.DriveFile
 import com.drivemusic.shared.model.PlaySource
@@ -63,19 +65,20 @@ fun BrowseScreen(
     onDownloadAll: (List<DriveFile>) -> Unit,
     downloadProgress: Pair<Int, Int>?,
 ) {
-    var stack by remember { mutableStateOf(listOf(Crumb("root", "My Drive"))) }
+    var stack by remember { mutableStateOf(listOf(Crumb("root", ""))) }
     var items by remember { mutableStateOf<List<DriveFile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val current = stack.last()
+    val rootName = stringResource(R.string.my_drive)
+    val current = stack.last().let { if (it.name.isEmpty()) it.copy(name = rootName) else it }
 
     LaunchedEffect(current.id) {
         isLoading = true
         error = null
         runCatching { drive.listFolder(current.id) }
             .onSuccess { items = it }
-            .onFailure { error = it.message ?: "Could not load this folder" }
+            .onFailure { error = it.message ?: "" }
         isLoading = false
     }
 
@@ -89,7 +92,7 @@ fun BrowseScreen(
         ) {
             if (stack.size > 1) {
                 IconButton(onClick = { stack = stack.dropLast(1) }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                 }
             }
             Text(
@@ -121,13 +124,14 @@ fun BrowseScreen(
                         strokeWidth = 2.dp,
                     )
                     Text(
-                        "Downloading ${downloadProgress.first} of ${downloadProgress.second}",
+                        stringResource(R.string.downloading_lld_lld, downloadProgress.first, downloadProgress.second),
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 } else {
                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                     Text(
-                        if (remaining == 0) "All downloaded" else "Download all ($remaining)",
+                        if (remaining == 0) stringResource(R.string.all_downloaded)
+                        else stringResource(R.string.download_all_lld, remaining),
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
@@ -143,10 +147,14 @@ fun BrowseScreen(
         when {
             isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             error != null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text(error!!, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(24.dp))
+                Text(
+                    error!!.ifEmpty { stringResource(R.string.could_not_load_folder) },
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(24.dp),
+                )
             }
             items.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text("Nothing playable in this folder")
+                Text(stringResource(R.string.nothing_playable_here))
             }
             else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(items, key = { it.id }) { file ->
@@ -188,7 +196,7 @@ fun TrackRow(
     onClick: () -> Unit,
     onQueue: (() -> Unit)? = null,
     queueIcon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.Add,
-    queueLabel: String = "Play next",
+    queueLabel: String? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
@@ -211,7 +219,7 @@ fun TrackRow(
             )
             if (isDownloaded) {
                 Text(
-                    "Downloaded",
+                    stringResource(R.string.downloaded),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
@@ -219,7 +227,7 @@ fun TrackRow(
         }
         if (onQueue != null) {
             IconButton(onClick = onQueue) {
-                Icon(queueIcon, contentDescription = queueLabel)
+                Icon(queueIcon, contentDescription = queueLabel ?: stringResource(R.string.play_next))
             }
         }
     }
@@ -251,7 +259,7 @@ private fun BrowseTrackRow(
             Text(file.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (isDownloaded) {
                 Text(
-                    "Downloaded",
+                    stringResource(R.string.downloaded),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
@@ -259,12 +267,12 @@ private fun BrowseTrackRow(
         }
         Box {
             IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More")
+                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
             }
             AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                AppMenuItem("Play next", { onQueue(); menuOpen = false }, Icons.Default.QueuePlayNext)
+                AppMenuItem(stringResource(R.string.play_next), { onQueue(); menuOpen = false }, Icons.Default.QueuePlayNext)
                 AppMenuItem(
-                    "Add to playlist",
+                    stringResource(R.string.add_to_playlist),
                     { onAddToPlaylist(); menuOpen = false },
                     Icons.Default.PlaylistAdd,
                 )

@@ -1,6 +1,8 @@
 package com.drivemusic.android.player
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.drivemusic.android.R
 import com.drivemusic.android.audio.EqSettings
 
 /**
@@ -61,9 +63,9 @@ class SettingsStore(context: Context) {
 }
 
 /** How a track list is ordered. Mirrors the iOS sort menu. */
-enum class TrackSort(val label: String) {
-    NAME("Name"),
-    RECENTLY_ADDED("Recently added"),
-    ARTIST("Artist"),
-    ALBUM("Album");
+enum class TrackSort(@StringRes val labelRes: Int) {
+    NAME(R.string.alphabetical),
+    RECENTLY_ADDED(R.string.date_added),
+    ARTIST(R.string.artist),
+    ALBUM(R.string.album);
 }

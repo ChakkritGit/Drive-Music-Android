@@ -27,11 +27,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.media3.common.util.UnstableApi
+import com.drivemusic.android.R
 import com.drivemusic.android.auth.GoogleAuth
 import com.drivemusic.android.player.PlayerViewModel
 import androidx.compose.ui.platform.LocalContext
@@ -109,14 +111,14 @@ private fun AppRoot(container: AppContainer, onThemeChange: (AppTheme) -> Unit) 
         // what made "Sign in with Google" flash on every launch of an already-signed-in app.
         GoogleAuth.State.Checking -> Centered { CircularProgressIndicator() }
         is GoogleAuth.State.Authorized -> SignedInApp(container, onThemeChange)
-        is GoogleAuth.State.NeedsConsent -> Centered { Text("Waiting for permission…") }
+        is GoogleAuth.State.NeedsConsent -> Centered { Text(stringResource(R.string.waiting_for_permission)) }
         is GoogleAuth.State.Failed -> Centered {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text((authState as GoogleAuth.State.Failed).message)
-                Button(onClick = { container.auth.signOut() }) { Text("Try again") }
+                Button(onClick = { container.auth.signOut() }) { Text(stringResource(R.string.try_again)) }
             }
         }
         GoogleAuth.State.SignedOut -> Centered {
@@ -124,8 +126,8 @@ private fun AppRoot(container: AppContainer, onThemeChange: (AppTheme) -> Unit) 
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("Drive Music", style = MaterialTheme.typography.headlineMedium)
-                Text("Sign in to play the music in your Google Drive.")
+                Text(stringResource(R.string.drive_music), style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.sign_in_prompt))
                 SignInButton(container)
             }
         }
@@ -137,7 +139,7 @@ private fun SignInButton(container: AppContainer) {
     var busy by remember { mutableStateOf(false) }
     LaunchedEffect(busy) { if (busy) { container.auth.authorize(); busy = false } }
     Button(onClick = { busy = true }, enabled = !busy) {
-        Text(if (busy) "Connecting…" else "Connect Google Drive")
+        Text(stringResource(if (busy) R.string.connecting else R.string.connect_google_drive))
     }
 }
 

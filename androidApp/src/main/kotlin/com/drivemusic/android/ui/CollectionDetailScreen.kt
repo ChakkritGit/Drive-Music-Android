@@ -27,8 +27,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.drivemusic.android.R
 import com.drivemusic.android.player.PlayerViewModel
 import com.drivemusic.shared.model.DriveFile
 
@@ -65,7 +67,7 @@ fun CollectionDetailScreen(
         )
 
             if (collection.tracks.isEmpty()) {
-                EmptyState("Nothing here", "This collection has no tracks.")
+                EmptyState(stringResource(R.string.nothing_here), stringResource(R.string.collection_empty))
                 return@Column
             }
 
@@ -86,11 +88,14 @@ fun CollectionDetailScreen(
                             strokeWidth = 2.dp,
                         )
                         Text(
-                            "Downloading ${progress.first} of ${progress.second}",
+                            stringResource(R.string.downloading_lld_lld, progress.first, progress.second),
                             modifier = Modifier.padding(start = 8.dp),
                         )
                     } else {
-                        Text(if (remaining == 0) "All downloaded" else "Download all ($remaining)")
+                        Text(
+                            if (remaining == 0) stringResource(R.string.all_downloaded)
+                            else stringResource(R.string.download_all_lld, remaining)
+                        )
                     }
                 }
             }
@@ -101,7 +106,7 @@ fun CollectionDetailScreen(
                 )
             }
 
-            SearchField(query, "Search this collection") { query = it }
+            SearchField(query, stringResource(R.string.search_this_collection)) { query = it }
 
             LazyColumn(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(visible, key = { it.id }) { file ->
@@ -118,7 +123,7 @@ fun CollectionDetailScreen(
                         },
                         onQueue = { onAddToPlaylist(file) },
                         queueIcon = Icons.Default.PlaylistAdd,
-                        queueLabel = "Add to playlist",
+                        queueLabel = stringResource(R.string.add_to_playlist),
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }

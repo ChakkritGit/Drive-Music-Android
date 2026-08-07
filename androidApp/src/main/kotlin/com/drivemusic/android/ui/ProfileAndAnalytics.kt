@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -47,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.drivemusic.android.R
 import com.drivemusic.android.AppContainer
 import com.drivemusic.android.auth.GoogleAuth
 import coil.compose.AsyncImage
@@ -92,7 +94,7 @@ fun ProfileScreen(
                 Avatar(account?.pictureUrl, size = 56.dp)
                 Column {
                     Text(
-                        account?.name ?: "Signed in",
+                        account?.name ?: stringResource(R.string.signed_in),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     account?.email?.let {
@@ -106,12 +108,12 @@ fun ProfileScreen(
             }
         }
 
-        SettingsSection("Preferences")
+        SettingsSection(stringResource(R.string.preferences))
         SettingsGroup {
             ChoiceRow(
                 icon = Icons.Default.Contrast,
-                label = "Appearance",
-                options = AppTheme.entries.map { it to it.title },
+                label = stringResource(R.string.appearance),
+                options = AppTheme.entries.map { it to stringResource(it.labelRes) },
                 selected = theme,
             ) {
                 theme = it
@@ -124,13 +126,13 @@ fun ProfileScreen(
 
             ChoiceRow(
                 icon = Icons.Default.Language,
-                label = "Language",
+                label = stringResource(R.string.language),
                 options = AppLanguage.entries.map { it to it.nativeName },
                 selected = language,
             ) { language = it; appearance.language = it }
         }
 
-        SettingsSection("About")
+        SettingsSection(stringResource(R.string.about))
         SettingsGroup {
             LegalPage.entries.forEachIndexed { index, page ->
                 if (index > 0) SettingsDivider()
@@ -142,7 +144,7 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(page.icon, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
-                    Text(page.title, modifier = Modifier.weight(1f))
+                    Text(stringResource(page.titleRes), modifier = Modifier.weight(1f))
                     Icon(
                         Icons.AutoMirrored.Filled.OpenInNew,
                         contentDescription = null,
@@ -166,7 +168,7 @@ fun ProfileScreen(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
                 )
-                Text("Sign Out", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.sign_out), color = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -174,22 +176,28 @@ fun ProfileScreen(
     if (confirmingSignOut) {
         AlertDialog(
             onDismissRequest = { confirmingSignOut = false },
-            title = { Text("Sign out of Drive Music?") },
-            text = { Text("You'll need to sign in again to access your Drive library.") },
+            title = { Text(stringResource(R.string.sign_out_of_drive_music)) },
+            text = { Text(stringResource(R.string.you_ll_need_to_sign_in_again_to_access_your_drive_library)) },
             confirmButton = {
                 TextButton(onClick = { confirmingSignOut = false; onSignOut() }) {
-                    Text("Sign Out", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.sign_out), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmingSignOut = false }) { Text("Cancel") } },
+            dismissButton = {
+                TextButton(onClick = { confirmingSignOut = false }) { Text(stringResource(R.string.cancel)) }
+            },
         )
     }
 }
 
 /** The two documents the web app serves — linked rather than shipped, so wording changes need no release. */
-enum class LegalPage(val title: String, val url: String, val icon: ImageVector) {
-    PRIVACY("Privacy Policy", "https://drive-music-taupe.vercel.app/privacy", Icons.Default.Shield),
-    TERMS("Terms of Service", "https://drive-music-taupe.vercel.app/terms", Icons.Default.Description),
+enum class LegalPage(
+    @androidx.annotation.StringRes val titleRes: Int,
+    val url: String,
+    val icon: ImageVector,
+) {
+    PRIVACY(R.string.privacy_policy, "https://drive-music-taupe.vercel.app/privacy", Icons.Default.Shield),
+    TERMS(R.string.terms_of_service, "https://drive-music-taupe.vercel.app/terms", Icons.Default.Description),
 }
 
 /**
@@ -296,19 +304,19 @@ fun AnalyticsScreen(state: PlayerViewModel.UiState) {
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Library", style = MaterialTheme.typography.titleMedium)
-        StatRow("Downloaded tracks", state.cachedTracks.size.toString())
-        StatRow("Artists", state.artists.size.toString())
-        StatRow("Playlists", state.playlists.size.toString())
-        StatRow("Recently played sources", state.recentSources.size.toString())
-        StatRow("Storage used", formatBytes(state.cacheBytes))
+        Text(stringResource(R.string.library), style = MaterialTheme.typography.titleMedium)
+        StatRow(stringResource(R.string.downloaded_tracks), state.cachedTracks.size.toString())
+        StatRow(stringResource(R.string.artists), state.artists.size.toString())
+        StatRow(stringResource(R.string.playlists), state.playlists.size.toString())
+        StatRow(stringResource(R.string.recently_played_sources), state.recentSources.size.toString())
+        StatRow(stringResource(R.string.storage_used), formatBytes(state.cacheBytes))
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-        Text("Most played sources", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.most_played_sources), style = MaterialTheme.typography.titleMedium)
         if (state.recentSources.isEmpty()) {
             Text(
-                "Nothing played yet.",
+                stringResource(R.string.nothing_played_yet),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )

@@ -1,6 +1,8 @@
 package com.drivemusic.android.player
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.drivemusic.android.R
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
@@ -10,10 +12,10 @@ import androidx.core.os.LocaleListCompat
  * can be pinned to Light, or to Thai, without touching system Settings. Mirrors the iOS
  * `AppTheme`/`AppLanguage` pair, including the "system means no override" case.
  */
-enum class AppTheme(val title: String) {
-    SYSTEM("System"),
-    LIGHT("Light"),
-    DARK("Dark");
+enum class AppTheme(@StringRes val labelRes: Int) {
+    SYSTEM(R.string.system),
+    LIGHT(R.string.light),
+    DARK(R.string.dark);
 
     companion object { const val STORAGE_KEY = "drive-music-app-theme" }
 }

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings this app needs that the iOS catalog has no entry for. Translated rather
+     than left in English: a half-translated interface is worse than an untranslated
+     one, because the reader cannot tell which parts they are failing to find. -->
+<resources>
+    <string name="connect_google_drive">Connect Google Drive</string>
+    <string name="connecting">Connecting…</string>
+    <string name="waiting_for_permission">Waiting for permission…</string>
+    <string name="try_again">Try again</string>
+    <string name="sign_in_prompt">Sign in to play the music in your Google Drive.</string>
+    <string name="back">Back</string>
+    <string name="close">Close</string>
+    <string name="more">More</string>
+    <string name="pause">Pause</string>
+    <string name="previous">Previous</string>
+    <string name="repeat">Repeat</string>
+    <string name="favourite">Favourite</string>
+    <string name="favourites">Favourites</string>
+    <string name="downloaded">Downloaded</string>
+    <string name="all_downloaded">All downloaded</string>
+    <string name="remove_download">Remove download</string>
+    <string name="delete_playlist">Delete playlist</string>
+    <string name="storage">Storage</string>
+    <string name="storage_used">Storage used</string>
+    <string name="downloaded_tracks">Downloaded tracks</string>
+    <string name="recently_played_sources">Recently played sources</string>
+    <string name="most_played_sources">Most played sources</string>
+    <string name="unknown_artist">Unknown artist</string>
+    <string name="now_playing_label">Now playing</string>
+    <string name="nothing_queued">Nothing queued after this track.</string>
+    <string name="library_empty">Your library is empty</string>
+    <string name="library_empty_detail">Anything you play from Drive is downloaded and kept here for offline.</string>
+    <string name="no_matches">No matches</string>
+    <string name="nothing_here">Nothing here</string>
+    <string name="collection_empty">This collection has no tracks.</string>
+    <string name="picked_from_what_you_play">Picked from what you play</string>
+    <string name="could_not_load_folder">Could not load this folder</string>
+    <string name="nothing_playable_here">Nothing playable in this folder</string>
+    <string name="playback_failed">Playback failed</string>
+    <string name="drive_auth_required">Drive authorization is required</string>
+    <string name="crossfade_detail">Blend one track into the next instead of cutting</string>
+    <string name="auto_mix_detail">Shape the crossfade as a DJ-style bass swap rather than a plain fade</string>
+    <string name="gapless_detail">Start the next track the instant this one ends</string>
+    <string name="normalization_detail">Even out tracks mastered at different levels</string>
+    <string name="eq_detail">Bass, mid and treble tone controls</string>
+    <string name="reset_to_flat">Reset to flat</string>
+    <string name="clear_all_data_detail">Removes every download, playlist and listening history from this device. Nothing in your Google Drive is touched.</string>
+    <string name="delete_everything">Delete everything</string>
+    <string name="clear_all_data_confirm">Downloads, playlists and listening history will be deleted from this device. This cannot be undone.</string>
+    <string name="add_to_playlist_action">Add to playlist</string>
+    <string name="play_next_action">Play next</string>
+    <string name="search_home">Search your music…</string>
+    <string name="track_count">%1$d tracks</string>
+    <string name="nothing_to_show_yet">Nothing to show yet</string>
+    <string name="head_to_browse">Head to Browse to play something from your Drive.</string>
+    <string name="no_playlists_detail">Create one above, or add a track to a new playlist from Browse.</string>
+    <string name="name_field">Name</string>
+</resources>

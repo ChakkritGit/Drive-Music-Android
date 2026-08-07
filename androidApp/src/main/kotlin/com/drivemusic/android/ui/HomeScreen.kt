@@ -27,9 +27,11 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.drivemusic.android.R
 import com.drivemusic.android.player.PlayerViewModel
 import com.drivemusic.shared.model.CachedTrack
 import com.drivemusic.shared.model.DriveFile
@@ -60,8 +62,8 @@ fun HomeScreen(
 
     if (!hasAnything) {
         EmptyState(
-            title = "Nothing to show yet",
-            message = "Head to Browse to play something from your Drive.",
+            title = stringResource(R.string.nothing_to_show_yet),
+            message = stringResource(R.string.head_to_browse),
         )
         return
     }
@@ -79,16 +81,19 @@ fun HomeScreen(
     ) {
         if (state.recentSources.isNotEmpty()) {
             item {
-                Shelf("Recently played", Icons.Default.Schedule) {
+                Shelf(stringResource(R.string.recently_played), Icons.Default.Schedule) {
                     items(state.recentSources, key = { it.source.id }) { recent ->
+                        // Resolved here, in the composable, rather than inside `onClick` — a
+                        // click handler is not a composition and cannot read resources.
+                        val label = sourceLabel(recent.source.kind)
                         CollectionCardFor(
                             viewModel = viewModel,
                             title = recent.source.name,
-                            subtitle = sourceLabel(recent.source.kind),
+                            subtitle = label,
                             tracks = recent.tracks,
                             onClick = {
                                 onOpenCollection(
-                                    Collection(recent.source.name, sourceLabel(recent.source.kind), recent.tracks, recent.source)
+                                    Collection(recent.source.name, label, recent.tracks, recent.source)
                                 )
                             },
                         )
@@ -99,7 +104,8 @@ fun HomeScreen(
 
         if (state.playlists.isNotEmpty()) {
             item {
-                Shelf("Your playlists", null) {
+                val playlistLabel = stringResource(R.string.playlist)
+                Shelf(stringResource(R.string.your_playlists), null) {
                     items(state.playlists, key = { it.id }) { playlist ->
                         CollectionCardFor(
                             viewModel = viewModel,
@@ -123,23 +129,38 @@ fun HomeScreen(
 
         if (state.cachedTracks.isNotEmpty()) {
             item {
-                Shelf("Recommended for you", Icons.Default.AutoAwesome) {
+                // Titles and subtitles are read here, once, and reused for both the card and the
+                // collection it opens — a click handler cannot read resources.
+                val shuffleAllTitle = stringResource(R.string.shuffle_all)
+                val allDownloaded = stringResource(R.string.all_downloaded_tracks)
+                val recentlyAddedTitle = stringResource(R.string.recently_added)
+                val fromDownloads = stringResource(R.string.from_your_downloads)
+                val madeForYouTitle = stringResource(R.string.made_for_you)
+                val basedOnListening = stringResource(R.string.based_on_your_listening)
+
+                Shelf(stringResource(R.string.recommended_for_you), Icons.Default.AutoAwesome) {
                     item {
                         CollectionCardFor(
-                            viewModel, "Shuffle All", trackCount(shuffleAll.size) + " downloaded", shuffleAll,
-                            onClick = { onOpenCollection(Collection("Shuffle All", "All downloaded tracks", shuffleAll, null)) },
+                            viewModel, shuffleAllTitle, allDownloaded, shuffleAll,
+                            onClick = {
+                                onOpenCollection(Collection(shuffleAllTitle, allDownloaded, shuffleAll, null))
+                            },
                         )
                     }
                     item {
                         CollectionCardFor(
-                            viewModel, "Recently Added", "From your downloads", recentlyAdded,
-                            onClick = { onOpenCollection(Collection("Recently Added", "From your downloads", recentlyAdded, null)) },
+                            viewModel, recentlyAddedTitle, fromDownloads, recentlyAdded,
+                            onClick = {
+                                onOpenCollection(Collection(recentlyAddedTitle, fromDownloads, recentlyAdded, null))
+                            },
                         )
                     }
                     item {
                         CollectionCardFor(
-                            viewModel, "Made For You", "Picked from what you play", madeForYou,
-                            onClick = { onOpenCollection(Collection("Made For You", "Picked from what you play", madeForYou, null)) },
+                            viewModel, madeForYouTitle, basedOnListening, madeForYou,
+                            onClick = {
+                                onOpenCollection(Collection(madeForYouTitle, basedOnListening, madeForYou, null))
+                            },
                         )
                     }
                 }
@@ -149,7 +170,7 @@ fun HomeScreen(
         val artists = state.artists
         if (artists.isNotEmpty()) {
             item {
-                Shelf("Artists", Icons.Default.Mic) {
+                Shelf(stringResource(R.string.artists), Icons.Default.Mic) {
                     items(artists, key = { it.first }) { (artist, tracks) ->
                         val files = tracks.map { it.driveMeta }
                         CollectionCardFor(
@@ -228,7 +249,7 @@ private fun SearchResults(state: PlayerViewModel.UiState, viewModel: PlayerViewM
     }
 
     if (matches.isEmpty()) {
-        EmptyState("No matches", "Nothing downloaded matches \"$query\".")
+        EmptyState(stringResource(R.string.no_matches), stringResource(R.string.no_downloaded_tracks_match, query))
         return
     }
 
@@ -247,14 +268,26 @@ private fun SearchResults(state: PlayerViewModel.UiState, viewModel: PlayerViewM
     }
 }
 
-private fun sourceLabel(kind: PlaySource.Kind) = when (kind) {
-    PlaySource.Kind.PLAYLIST -> "Playlist"
-    PlaySource.Kind.LIBRARY -> "Library"
-    PlaySource.Kind.FOLDER -> "Folder"
-    PlaySource.Kind.GENERATED -> "Mix"
-}
+@Composable
+private fun sourceLabel(kind: PlaySource.Kind) = stringResource(
+    when (kind) {
+        PlaySource.Kind.PLAYLIST -> R.string.playlist
+        PlaySource.Kind.LIBRARY -> R.string.library
+        PlaySource.Kind.FOLDER -> R.string.folder
+        PlaySource.Kind.GENERATED -> R.string.mix
+    }
+)
 
-fun trackCount(count: Int) = "$count track" + if (count == 1) "" else "s"
+/**
+ * "3 tracks".
+ *
+ * A plural resource rather than string concatenation with an "s": Thai and Japanese have no
+ * plural form at all, so appending a letter produces text that is wrong in both — and the catalog
+ * translations already read naturally without one.
+ */
+@Composable
+fun trackCount(count: Int): String =
+    androidx.compose.ui.res.pluralStringResource(R.plurals.track_count, count, count)
 
 @Composable
 fun SectionHeader(title: String, subtitle: String? = null) {

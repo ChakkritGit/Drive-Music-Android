@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A plural resource, not a string with an "s" appended. Thai and Japanese have no plural form,
+      so concatenating a letter is wrong in both; the platform picks the right form per locale.
+    -->
+    <plurals name="track_count">
+        <item quantity="one">%d เพลง</item>
+        <item quantity="other">%d เพลง</item>
+    </plurals>
+</resources>

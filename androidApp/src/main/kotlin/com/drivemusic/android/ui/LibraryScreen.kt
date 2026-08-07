@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import com.drivemusic.android.R
 import com.drivemusic.android.player.PlayerViewModel
 import com.drivemusic.android.player.TrackSort
 import com.drivemusic.shared.model.CachedTrack
@@ -91,8 +93,8 @@ fun LibraryScreen(
 
     if (state.cachedTracks.isEmpty()) {
         EmptyState(
-            title = "Your library is empty",
-            message = "Anything you play from Drive is downloaded and kept here for offline.",
+            title = stringResource(R.string.library_empty),
+            message = stringResource(R.string.library_empty_detail),
         )
         return
     }
@@ -103,7 +105,7 @@ fun LibraryScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Downloaded — available offline",
+                stringResource(R.string.downloaded_available_offline),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.weight(1f),
@@ -111,7 +113,7 @@ fun LibraryScreen(
             SortMenu(sort) { sort = it }
         }
         Text(
-            "${sorted.size} tracks · ${formatBytes(state.cacheBytes)}",
+            "${stringResource(R.string.track_count, sorted.size)} · ${formatBytes(state.cacheBytes)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(horizontal = 16.dp),
@@ -147,12 +149,12 @@ fun SortMenu(current: TrackSort, onSelect: (TrackSort) -> Unit) {
     Box {
         TextButton(onClick = { expanded = true }) {
             Icon(Icons.Default.Sort, contentDescription = null)
-            Text(current.label, modifier = Modifier.padding(start = 4.dp))
+            Text(stringResource(current.labelRes), modifier = Modifier.padding(start = 4.dp))
         }
         AppMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             TrackSort.entries.forEach { option ->
                 AppMenuItem(
-                    label = option.label,
+                    label = stringResource(option.labelRes),
                     onClick = { onSelect(option); expanded = false },
                     icon = Icons.Default.Check.takeIf { option == current },
                     tint = MaterialTheme.colorScheme.primary,
@@ -230,7 +232,7 @@ fun CachedTrackRow(
             )
             Text(
                 listOfNotNull(track.parsedMeta.artist, track.parsedMeta.album)
-                    .joinToString(" · ").ifEmpty { "Unknown artist" },
+                    .joinToString(" · ").ifEmpty { stringResource(R.string.unknown_artist) },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 maxLines = 1,
@@ -239,18 +241,18 @@ fun CachedTrackRow(
         }
         Box {
             IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More")
+                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
             }
             AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 onQueue?.let {
-                    AppMenuItem("Play next", { it(); menuOpen = false }, Icons.Default.QueuePlayNext)
+                    AppMenuItem(stringResource(R.string.play_next), { it(); menuOpen = false }, Icons.Default.QueuePlayNext)
                 }
                 onAddToPlaylist?.let {
-                    AppMenuItem("Add to playlist", { it(); menuOpen = false }, Icons.Default.PlaylistAdd)
+                    AppMenuItem(stringResource(R.string.add_to_playlist), { it(); menuOpen = false }, Icons.Default.PlaylistAdd)
                 }
                 onRemoveDownload?.let {
                     AppMenuItem(
-                        "Remove download",
+                        stringResource(R.string.remove_download),
                         { it(); menuOpen = false },
                         Icons.Default.Delete,
                         tint = MaterialTheme.colorScheme.error,
