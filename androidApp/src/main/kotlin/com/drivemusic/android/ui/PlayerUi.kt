@@ -60,9 +60,11 @@ fun CollectionActions(
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
+    contentPadding: androidx.compose.foundation.layout.PaddingValues =
+        androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(contentPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Button(onClick = onPlay) {

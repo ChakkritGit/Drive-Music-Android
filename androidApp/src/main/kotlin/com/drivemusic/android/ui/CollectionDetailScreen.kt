@@ -79,7 +79,10 @@ fun CollectionDetailScreen(
                 CollectionActions(
                     onPlay = { viewModel.play(collection.tracks, 0, collection.source) },
                     onShuffle = { viewModel.shufflePlay(collection.tracks, collection.source) },
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    // Tighter above, because the status line it follows is about the same
+                    // collection these buttons act on; tighter below, because the list starts
+                    // there and a wide gap made the first track look detached from the header.
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 6.dp),
                 )
             }
         }
