@@ -71,7 +71,16 @@ fun CollectionDetailScreen(
                 )
             }
             item { DownloadAllRow(remaining, progress) { viewModel.downloadAll(collection.tracks) } }
-            item { SearchBar(query, stringResource(R.string.search_this_collection)) { query = it } }
+            // The header is three separate statements — what you can do with this collection,
+            // what state its files are in, and how to narrow it — and with no space between them
+            // they read as one block of clutter above the tracks.
+            item {
+                SearchBar(
+                    query,
+                    stringResource(R.string.search_this_collection),
+                    modifier = Modifier.padding(bottom = 12.dp),
+                ) { query = it }
+            }
         }
 
         when {
@@ -112,7 +121,7 @@ fun CollectionDetailScreen(
 @Composable
 private fun DownloadAllRow(remaining: Int, progress: Pair<Int, Int>?, onDownload: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
