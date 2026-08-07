@@ -122,7 +122,9 @@ fun CollectionDetailScreen(
 @Composable
 private fun DownloadAllRow(remaining: Int, progress: Pair<Int, Int>?, onDownload: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        // More above than below: it belongs to the search field it reports on, not to the
+        // buttons underneath, and equal padding made it read as floating between the two.
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
