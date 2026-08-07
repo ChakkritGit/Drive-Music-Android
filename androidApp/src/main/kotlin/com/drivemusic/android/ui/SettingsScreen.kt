@@ -59,6 +59,24 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
                 checked = state.autoMixEnabled,
                 onChange = viewModel::setAutoMixEnabled,
             )
+            // Nested under Auto mix, as on iOS: both only mean anything while a mix is being
+            // shaped, and shown at the top level they read as things that happen on their own.
+            if (state.autoMixEnabled) {
+                SettingsDivider(startInset = 16.dp)
+                SwitchRow(
+                    title = stringResource(R.string.beatmatching),
+                    subtitle = stringResource(R.string.beatmatching_detail),
+                    checked = state.beatmatchEnabled,
+                    onChange = viewModel::setBeatmatchEnabled,
+                )
+                SettingsDivider(startInset = 16.dp)
+                SwitchRow(
+                    title = stringResource(R.string.analyze_tracks_automatically),
+                    subtitle = stringResource(R.string.analyze_tracks_detail),
+                    checked = state.autoAnalyzeEnabled,
+                    onChange = viewModel::setAutoAnalyzeEnabled,
+                )
+            }
         }
         SettingsDivider(startInset = 16.dp)
         SwitchRow(
@@ -89,6 +107,22 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
             checked = state.volumeNormalizationEnabled,
             onChange = viewModel::setVolumeNormalizationEnabled,
         )
+        SettingsDivider(startInset = 16.dp)
+        SwitchRow(
+            title = stringResource(R.string.spatial_audio),
+            subtitle = stringResource(R.string.adds_a_sense_of_width_and_space_to_stereo_tracks),
+            checked = state.spatialAudioEnabled,
+            onChange = viewModel::setSpatialAudioEnabled,
+        )
+        if (state.spatialAudioEnabled) {
+            SliderRow(
+                title = stringResource(R.string.intensity),
+                value = state.spatialAudioIntensity.toFloat(),
+                range = 0f..PlayerViewModel.MAX_SPATIAL_INTENSITY.toFloat(),
+                display = "${state.spatialAudioIntensity.toInt()}%",
+                onChange = { viewModel.setSpatialAudioIntensity(it.toDouble()) },
+            )
+        }
         SettingsDivider(startInset = 16.dp)
         SwitchRow(
             title = stringResource(R.string.equalizer),

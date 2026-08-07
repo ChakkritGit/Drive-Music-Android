@@ -73,6 +73,19 @@ class CrossfadeEngine(
             processors.values.forEach { it.parameters = it.parameters.copy(eq = value) }
         }
 
+    /**
+     * The user's spatial-audio wet mix, 0..100. 0 leaves the reverb out of the path entirely.
+     *
+     * Re-applied at every point the automation rebuilds a slot's parameters, exactly as [eq] is:
+     * a transition writes a whole new [SlotParameters] several times a second, so a standing
+     * preference that is only written once is erased by the first mix that happens after it.
+     */
+    var spatialWet: Double = 0.0
+        set(value) {
+            field = value
+            processors.values.forEach { it.parameters = it.parameters.copy(spatialWet = value) }
+        }
+
     fun player(slot: PlaybackSlot): ExoPlayer = players.getValue(slot)
 
     /**
@@ -151,8 +164,8 @@ class CrossfadeEngine(
             playbackParameters = PlaybackParameters(plan.incomingRate)
             playWhenReady = true
         }
-        processors.getValue(incoming).parameters = SlotAutomation.incoming(plan.shape, 0.0, eq)
-        processors.getValue(outgoing).parameters = SlotAutomation.outgoing(plan.shape, 0.0, eq)
+        processors.getValue(incoming).parameters = SlotAutomation.incoming(plan.shape, 0.0, eq).copy(spatialWet = spatialWet)
+        processors.getValue(outgoing).parameters = SlotAutomation.outgoing(plan.shape, 0.0, eq).copy(spatialWet = spatialWet)
 
         rampJob = scope.launch {
             val durationMs = (plan.duration * 1000).toLong().coerceAtLeast(1)
@@ -160,8 +173,8 @@ class CrossfadeEngine(
             while (isActive) {
                 val elapsed = System.currentTimeMillis() - startedAt
                 val t = (elapsed.toDouble() / durationMs).coerceIn(0.0, 1.0)
-                processors.getValue(outgoing).parameters = SlotAutomation.outgoing(plan.shape, t, eq)
-                processors.getValue(incoming).parameters = SlotAutomation.incoming(plan.shape, t, eq)
+                processors.getValue(outgoing).parameters = SlotAutomation.outgoing(plan.shape, t, eq).copy(spatialWet = spatialWet)
+                processors.getValue(incoming).parameters = SlotAutomation.incoming(plan.shape, t, eq).copy(spatialWet = spatialWet)
                 if (t >= 1.0) break
                 delay(RAMP_INTERVAL_MS)
             }
@@ -172,11 +185,11 @@ class CrossfadeEngine(
                 // Cleared or the slot would still be a looping clip the next time it is used.
                 repeatMode = Player.REPEAT_MODE_OFF
             }
-            processors.getValue(outgoing).parameters = SlotParameters.silent.copy(eq = eq)
+            processors.getValue(outgoing).parameters = SlotParameters.silent.copy(eq = eq).copy(spatialWet = spatialWet)
             // The incoming slot is now simply playing, so its chain has to be open — leaving it at
             // the transition's end state would keep whatever filtering the last keyframe held for
             // the rest of the track.
-            processors.getValue(incoming).parameters = SlotParameters.open.copy(eq = eq)
+            processors.getValue(incoming).parameters = SlotParameters.open.copy(eq = eq).copy(spatialWet = spatialWet)
             player(incoming).playbackParameters = PlaybackParameters(1f)
 
             activeSlot = incoming
@@ -224,8 +237,8 @@ class CrossfadeEngine(
         rampJob = null
         isTransitioning = false
 
-        processors.getValue(activeSlot).parameters = SlotParameters.open.copy(eq = eq)
-        processors.getValue(activeSlot.other).parameters = SlotParameters.silent.copy(eq = eq)
+        processors.getValue(activeSlot).parameters = SlotParameters.open.copy(eq = eq).copy(spatialWet = spatialWet)
+        processors.getValue(activeSlot.other).parameters = SlotParameters.silent.copy(eq = eq).copy(spatialWet = spatialWet)
         player(activeSlot.other).apply {
             stop()
             playbackParameters = PlaybackParameters(1f)

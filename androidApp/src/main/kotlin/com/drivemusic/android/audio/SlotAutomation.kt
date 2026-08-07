@@ -43,6 +43,12 @@ data class SlotParameters(
      * preference that must survive it. Adding them together would let a swap cancel the user's EQ.
      */
     val eq: EqSettings = EqSettings.flat,
+    /**
+     * The user's spatial-audio wet mix, 0..100. Separate from [reverbWet] for the same reason
+     * [eq] is separate from [bassDb]: that one is the transition's own reverb and moves throughout
+     * a mix, while this is a standing preference that has to survive it.
+     */
+    val spatialWet: Double = 0.0,
 ) {
     companion object {
         /** Full level, every filter open — what a slot sits at outside a transition. */

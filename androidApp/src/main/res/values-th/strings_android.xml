@@ -60,4 +60,6 @@
     <string name="create_playlist">สร้างเพลย์ลิสต์</string>
     <string name="no_playlists_yet_create_one">ยังไม่มีเพลย์ลิสต์ สร้างใหม่ หรือเพิ่มเพลงลงเพลย์ลิสต์ใหม่จากเมนูของเพลง</string>
     <string name="delete_playlist_confirm">ลบ “%1$s” ไหม เพลย์ลิสต์จะถูกลบ แต่เพลงที่ดาวน์โหลดไว้ยังอยู่</string>
+    <string name="beatmatching_detail">ปรับความเร็วเพลงที่กำลังเข้ามาเล็กน้อย ให้ทั้งสองเพลงลงจังหวะเดียวกันตลอดช่วงมิกซ์</string>
+    <string name="analyze_tracks_detail">อ่านจังหวะ คีย์ และจุดที่ควรมิกซ์เข้าออกของแต่ละเพลง ทำครั้งเดียวต่อเพลง เบื้องหลัง</string>
 </resources>

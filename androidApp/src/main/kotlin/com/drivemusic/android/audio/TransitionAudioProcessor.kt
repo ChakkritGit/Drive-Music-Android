@@ -70,6 +70,14 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
     private var eqMid: Array<Biquad> = emptyArray()
     private var eqTreble: Array<Biquad> = emptyArray()
 
+    /**
+     * The user's spatial reverb, distinct from [reverb] above — that one belongs to the transition
+     * and is driven by it. Two separate reverbs rather than one summed wetness: a mix that swells
+     * its own reverb must not also undo whatever the user has set, and one shared tail could not
+     * tell the two apart.
+     */
+    private var spatial: Array<Reverb> = emptyArray()
+
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         // 16-bit PCM only. Media3 hands float buffers through when float output is enabled, and
         // silently misreading those as shorts would be loud noise rather than a quiet bug, so this
@@ -83,6 +91,7 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         lowPass = Array(channelCount) { Biquad() }
         bass = Array(channelCount) { Biquad() }
         reverb = Array(channelCount) { Reverb(inputAudioFormat.sampleRate.toDouble()) }
+        spatial = Array(channelCount) { Reverb(inputAudioFormat.sampleRate.toDouble()) }
         eqBass = Array(channelCount) { Biquad() }
         eqMid = Array(channelCount) { Biquad() }
         eqTreble = Array(channelCount) { Biquad() }
@@ -134,6 +143,9 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         val current = parameters
         val volume = current.volume
         val wet = (current.reverbWet / 100).coerceIn(0.0, 1.0)
+        // Halved, matching the iOS ceiling: at full intensity the track should sound like it is in
+        // a large room, never like it has been replaced by its own reflections.
+        val spatialWet = (current.spatialWet / 100 * SPATIAL_WET_CEILING).coerceIn(0.0, 1.0)
         val toneEnabled = !current.eq.isFlat
         var peak = 0.0
 
@@ -154,6 +166,13 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
                     sample = eqBass[channel].process(sample)
                     sample = eqMid[channel].process(sample)
                     sample = eqTreble[channel].process(sample)
+                }
+                if (spatialWet > 0) {
+                    // After the tone controls, as on iOS, where this sits downstream of the user
+                    // EQ in the graph: the space is applied to the sound the user has shaped, not
+                    // shaped along with it.
+                    val tail = spatial[channel].process(sample.toFloat()).toDouble()
+                    sample = sample * (1 - spatialWet * 0.5) + tail * spatialWet
                 }
                 sample *= volume
                 // Clipped, not wrapped. A shelf boost or a resonant corner can push a sample past
@@ -190,6 +209,7 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         channelCount = 0
         sampleRate = 0
         reverb = emptyArray()
+        spatial = emptyArray()
     }
 
     private fun resetFilterState() {
@@ -200,6 +220,7 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         bass.forEach { it.reset() }
         // A reverb tail that survives a seek is the previous position still audibly ringing.
         reverb.forEach { it.clear() }
+        spatial.forEach { it.clear() }
         eqBass.forEach { it.reset() }
         eqMid.forEach { it.reset() }
         eqTreble.forEach { it.reset() }
@@ -213,6 +234,12 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         private const val SHORT_SCALE = 32768.0
         private const val MIN_SHORT = -32768
         private const val MAX_SHORT = 32767
+
+        /**
+         * Never fully wet. Matches the 0.5 ceiling `applySpatialAudio` uses on iOS, which the web
+         * version calls `WET_MAX` — some of the original signal always stays audible.
+         */
+        const val SPATIAL_WET_CEILING = 0.5
 
         /** Fast up, slow down — see `level`. */
         private const val LEVEL_ATTACK = 0.5f

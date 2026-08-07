@@ -35,6 +35,29 @@ class SettingsStore(context: Context) {
         get() = preferences.getBoolean(AMBIENT_GLOW, true)
         set(value) = preferences.edit().putBoolean(AMBIENT_GLOW, value).apply()
 
+    /**
+     * Whether a mixed transition also matches the two tracks' tempos.
+     *
+     * Off by default, as on iOS: it changes the speed of what is playing, and a listener who has
+     * not asked for that hears it as the track being wrong rather than as the mix being good.
+     */
+    var beatmatchEnabled: Boolean
+        get() = preferences.getBoolean(BEATMATCH, false)
+        set(value) = preferences.edit().putBoolean(BEATMATCH, value).apply()
+
+    /** Whether tracks are analysed as they are downloaded. */
+    var autoAnalyzeEnabled: Boolean
+        get() = preferences.getBoolean(AUTO_ANALYZE, true)
+        set(value) = preferences.edit().putBoolean(AUTO_ANALYZE, value).apply()
+
+    var spatialAudioEnabled: Boolean
+        get() = preferences.getBoolean(SPATIAL_AUDIO, false)
+        set(value) = preferences.edit().putBoolean(SPATIAL_AUDIO, value).apply()
+
+    var spatialAudioIntensity: Double
+        get() = preferences.getFloat(SPATIAL_INTENSITY, 50f).toDouble()
+        set(value) = preferences.edit().putFloat(SPATIAL_INTENSITY, value.toFloat()).apply()
+
     var gaplessEnabled: Boolean
         get() = preferences.getBoolean(GAPLESS, true)
         set(value) = preferences.edit().putBoolean(GAPLESS, value).apply()
@@ -63,6 +86,10 @@ class SettingsStore(context: Context) {
         const val AUTO_MIX = "drive-music-auto-mix-enabled"
         const val GAPLESS = "drive-music-gapless-enabled"
         const val AMBIENT_GLOW = "drive-music-ambient-glow-enabled"
+        const val BEATMATCH = "drive-music-beatmatch-enabled"
+        const val AUTO_ANALYZE = "drive-music-auto-analyze-enabled"
+        const val SPATIAL_AUDIO = "drive-music-spatial-audio-enabled"
+        const val SPATIAL_INTENSITY = "drive-music-spatial-audio-intensity"
         const val NORMALIZE = "drive-music-volume-normalization-enabled"
         const val EQ_ENABLED = "drive-music-eq-enabled"
         const val EQ_BASS = "drive-music-eq-bass"

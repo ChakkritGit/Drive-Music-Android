@@ -72,6 +72,10 @@ class PlayerViewModel(
         val autoMixEnabled: Boolean = true,
         val gaplessEnabled: Boolean = true,
         val ambientGlowEnabled: Boolean = true,
+        val beatmatchEnabled: Boolean = false,
+        val autoAnalyzeEnabled: Boolean = true,
+        val spatialAudioEnabled: Boolean = false,
+        val spatialAudioIntensity: Double = 50.0,
         /** Tempo, key and mix points per file id, for the tracks that have been analysed. */
         val analyses: Map<String, TrackAnalysis> = emptyMap(),
         val volumeNormalizationEnabled: Boolean = true,
@@ -163,6 +167,8 @@ class PlayerViewModel(
 
         val stored = settings.eq
         engine.eq = stored
+        engine.spatialWet =
+            if (settings.spatialAudioEnabled) settings.spatialAudioIntensity else 0.0
         _state.update {
             it.copy(
                 crossfadeEnabled = settings.crossfadeEnabled,
@@ -170,6 +176,10 @@ class PlayerViewModel(
                 autoMixEnabled = settings.autoMixEnabled,
                 gaplessEnabled = settings.gaplessEnabled,
                 ambientGlowEnabled = settings.ambientGlowEnabled,
+                beatmatchEnabled = settings.beatmatchEnabled,
+                autoAnalyzeEnabled = settings.autoAnalyzeEnabled,
+                spatialAudioEnabled = settings.spatialAudioEnabled,
+                spatialAudioIntensity = settings.spatialAudioIntensity,
                 volumeNormalizationEnabled = settings.volumeNormalizationEnabled,
                 eq = stored,
             )
@@ -296,6 +306,37 @@ class PlayerViewModel(
         _state.update { it.copy(crossfadeEnabled = enabled) }
     }
 
+    fun setBeatmatchEnabled(enabled: Boolean) {
+        settings.beatmatchEnabled = enabled
+        _state.update { it.copy(beatmatchEnabled = enabled) }
+    }
+
+    fun setAutoAnalyzeEnabled(enabled: Boolean) {
+        settings.autoAnalyzeEnabled = enabled
+        _state.update { it.copy(autoAnalyzeEnabled = enabled) }
+        // Turning it back on picks up whatever was skipped while it was off, rather than leaving
+        // those tracks unanalysed until they happen to be downloaded again.
+        if (enabled) viewModelScope.launch { analyzeBacklog() }
+    }
+
+    fun setSpatialAudioEnabled(enabled: Boolean) {
+        settings.spatialAudioEnabled = enabled
+        _state.update { it.copy(spatialAudioEnabled = enabled) }
+        applySpatialAudio()
+    }
+
+    fun setSpatialAudioIntensity(percent: Double) {
+        val clamped = percent.coerceIn(0.0, MAX_SPATIAL_INTENSITY)
+        settings.spatialAudioIntensity = clamped
+        _state.update { it.copy(spatialAudioIntensity = clamped) }
+        applySpatialAudio()
+    }
+
+    private fun applySpatialAudio() {
+        val current = _state.value
+        engine.spatialWet = if (current.spatialAudioEnabled) current.spatialAudioIntensity else 0.0
+    }
+
     fun setAmbientGlowEnabled(enabled: Boolean) {
         settings.ambientGlowEnabled = enabled
         _state.update { it.copy(ambientGlowEnabled = enabled) }
@@ -381,6 +422,7 @@ class PlayerViewModel(
     }
 
     private fun analyzeInBackground(track: CachedTrack) {
+        if (!_state.value.autoAnalyzeEnabled) return
         val existing = _state.value.analyses[track.fileId]
         if (existing != null && existing.version == TrackAnalyzer.VERSION) return
         if (analysisJob?.isActive == true) {
@@ -469,6 +511,10 @@ class PlayerViewModel(
                 autoMixEnabled = settings.autoMixEnabled,
                 gaplessEnabled = settings.gaplessEnabled,
                 ambientGlowEnabled = settings.ambientGlowEnabled,
+                beatmatchEnabled = settings.beatmatchEnabled,
+                autoAnalyzeEnabled = settings.autoAnalyzeEnabled,
+                spatialAudioEnabled = settings.spatialAudioEnabled,
+                spatialAudioIntensity = settings.spatialAudioIntensity,
                 volumeNormalizationEnabled = settings.volumeNormalizationEnabled,
                 eq = settings.eq,
             )
@@ -682,7 +728,7 @@ class PlayerViewModel(
             outgoingDuration = durationMs / 1000.0,
             fallbackDuration = state.crossfadeSeconds,
             autoMixEnabled = state.autoMixEnabled,
-            beatmatchEnabledByDefault = false,
+            beatmatchEnabledByDefault = state.beatmatchEnabled,
         )
 
         // Where the transition begins. With analysis, the outgoing track's mix-out point — the
@@ -794,6 +840,9 @@ class PlayerViewModel(
         /** Plays before the model's ranking is worth showing as a recommendation. */
         const val TRAINED_THRESHOLD = 5
         const val ARTIST_SHELF_LIMIT = 20
+
+        /** The spatial slider's ceiling, matching iOS's `maxSpatialIntensity`. */
+        const val MAX_SPATIAL_INTENSITY = 100.0
     }
 
     override fun onCleared() {

@@ -60,4 +60,6 @@
     <string name="create_playlist">Create playlist</string>
     <string name="no_playlists_yet_create_one">No playlists yet. Create one, or add a track to a new playlist from its menu.</string>
     <string name="delete_playlist_confirm">Delete “%1$s”? The playlist is removed. The tracks themselves stay downloaded.</string>
+    <string name="beatmatching_detail">Nudges the incoming track’s speed so the two share a beat through the mix.</string>
+    <string name="analyze_tracks_detail">Reads tempo, key and where each track is worth mixing in and out. Runs once per track, in the background.</string>
 </resources>
