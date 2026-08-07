@@ -2,7 +2,6 @@ package com.drivemusic.android.ui
 
 import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -16,7 +15,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.cos
-import kotlin.math.min
 import kotlin.math.sin
 
 /**
@@ -46,7 +44,11 @@ fun MixGlow(modifier: Modifier = Modifier) {
     }
     val accent = androidx.compose.material3.MaterialTheme.colorScheme.primary
 
-    Canvas(modifier = modifier.size(GLOW_SIZE)) {
+    // Sized to whatever the caller gives it — the button — and drawing well outside those bounds.
+    // Sizing it to the glow instead made the Box around the play button 128dp tall, so the whole
+    // transport row grew the moment playback started and every control shifted down with it.
+    // Nothing clips here, so drawing past the edge costs nothing but is invisible to layout.
+    Canvas(modifier = modifier) {
         val time = frame / 1000.0
 
         // The soft light the strands throw. Drawn as radial gradients rather than blurred solid
@@ -117,7 +119,9 @@ private fun DrawScope.helixPath(
     val path = Path()
     val cx = center.x
     val cy = center.y
-    val base = min(radius, min(size.width, size.height) / 2)
+    // The requested radius, not one clamped to the canvas: the canvas is the play button's own
+    // box and the strands are meant to travel outside it. Clamping put them inside the button.
+    val base = radius
 
     // 2° steps: fine enough to read as smooth at this diameter, coarse enough to stay cheap to
     // rebuild every frame.
@@ -137,9 +141,6 @@ private fun DrawScope.helixPath(
     path.close()
     return path
 }
-
-/** Wide enough for the outermost haze to fade out inside the canvas rather than being clipped. */
-private val GLOW_SIZE = 128.dp
 
 /** Sits outside the play button's own 72dp circle, so the strands read as light around it. */
 private const val STRAND_RADIUS = 48f

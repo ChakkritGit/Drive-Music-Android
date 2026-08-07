@@ -337,7 +337,9 @@ fun NowPlayingScreen(
                 // With the glow off there is nothing behind the cover at all and it sits flat on
                 // the background; with it on, the glow already does this and the two stack into
                 // mud.
-                ArtworkHalo(state.artwork, size = ARTWORK_SIZE)
+                // `matchParentSize`, so the halo contributes nothing to layout — the Box is
+                // sized by the cover alone, and the light simply spills out of it.
+                ArtworkHalo(state.artwork, modifier = Modifier.matchParentSize())
             }
         with(sharedScope) {
             Artwork(
@@ -546,7 +548,10 @@ private fun TransportControls(
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Wide enough to clear the mix glow. The strands travel on a 48dp radius around the play
+        // button's centre, and at the old 6dp the skip buttons sat inside that — the light drew
+        // straight across them.
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = viewModel::toggleShuffle, modifier = Modifier.size(44.dp)) {
@@ -583,12 +588,13 @@ private fun TransportControls(
             )
             if (fade > 0.01f) {
                 MixGlow(
-                    // Drawn unbounded, so the glow does not contribute its own width to the row.
-                    // Sized normally it made the transport 128dp wide at the centre and pushed
-                    // shuffle and repeat out to the screen's edges. iOS puts this in a
+                    // Matched to the button's own box, and drawing beyond it. The glow must not
+                    // contribute any size of its own: given its own, it widened the transport row
+                    // and pushed shuffle and repeat to the screen edges, and made the row taller
+                    // so every control dropped the moment playback started. iOS puts this in a
                     // `.background`, which is layout-neutral for the same reason.
                     modifier = Modifier
-                        .wrapContentSize(unbounded = true)
+                        .matchParentSize()
                         .graphicsLayer {
                             scaleX = scale
                             scaleY = scale

@@ -1,6 +1,7 @@
 package com.drivemusic.android.ui
 
 import android.graphics.Bitmap
+import android.os.Build
 import android.graphics.BitmapFactory
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -8,22 +9,19 @@ import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
@@ -89,54 +87,46 @@ fun AmbientGlow(
  * the two stack into mud; with it off there is nothing behind the cover at all and it sits flat on
  * the background.
  *
- * Blurred by drawing a handful of pixels across the whole area and letting the GPU interpolate,
- * rather than by a blur pass. `Modifier.blur` needs API 31 and this app runs from 26, and a real
- * blur over a large bitmap is expensive for something whose entire purpose is to be indistinct.
+ * Blurred properly where the platform can — `Modifier.blur` with an unbounded edge, which is what
+ * makes the light spill past its own bounds instead of stopping at them. That needs API 31, and
+ * this app runs from 26, so below that the blur is done by drawing a handful of pixels across the
+ * whole area and letting the GPU interpolate: cruder, but the same idea and free.
  *
- * The size is fixed at [HALO_PIXELS] rather than left to `inSampleSize`, which is relative to the
- * source: a large cover sampled down by the same factor still keeps enough structure to be
- * recognisable, and a recognisable copy sitting behind the original reads as a misprint rather
- * than as light. Six pixels across cannot resemble anything.
+ * The source is reduced to [HALO_PIXELS] either way. `inSampleSize` alone was not enough — it is a
+ * ratio, so a large cover reduced by the same factor still keeps enough structure to be
+ * recognisable, and a recognisable copy behind the original reads as a misprint rather than as
+ * light. Six pixels across cannot resemble anything.
  *
- * Centred, and with no rounded corner. Both were wrong for the same reason: a hard edge and an
- * offset are how you notice that something is a *copy* of the cover. Light has neither.
+ * Centred, with no rounded corner. Both were how you noticed it was a *copy* of the cover sitting
+ * behind it; light has neither.
+ *
+ * Sized by the caller to the cover's own box, with the spread coming entirely from the blur. An
+ * earlier version laid this out larger than the cover to get the spread, which made it claim that
+ * space in the layout and push everything below it down the screen. A decoration behind something
+ * should occupy nothing.
  */
 @Composable
-fun ArtworkHalo(artwork: ByteArray?, size: Dp, modifier: Modifier = Modifier) {
+fun ArtworkHalo(artwork: ByteArray?, modifier: Modifier = Modifier) {
     val thumbnail = rememberThumbnail(artwork) ?: return
 
     Image(
         bitmap = thumbnail.asImageBitmap(),
         contentDescription = null,
         contentScale = ContentScale.Crop,
-        // Bilinear, so the six pixels become a gradient rather than six squares.
+        // Bilinear, so the few pixels become a gradient rather than a grid of squares.
         filterQuality = FilterQuality.High,
         modifier = modifier
-            .size(size)
-            .graphicsLayer {
-                // Spread past the cover on every side, so what shows is only the spill.
-                scaleX = HALO_SPREAD
-                scaleY = HALO_SPREAD
-                alpha = 0.85f
-                // The fade below multiplies this layer's own alpha, which it needs a layer to
-                // multiply into.
-                compositingStrategy = CompositingStrategy.Offscreen
-            }
-            .drawWithContent {
-                drawContent()
-                // Faded to nothing at its edges. Blurring the colours was only half of it: a
-                // rectangle of soft colour is still a rectangle, and its boundary is exactly what
-                // gives away that there is an image back there rather than light.
-                drawRect(
-                    Brush.radialGradient(
-                        0.45f to Color.Black,
-                        1f to Color.Transparent,
-                        center = center,
-                        radius = size.toPx() / 2,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            },
+            .then(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    // Unbounded, so the blur may bleed past the image's own box. The bounded
+                    // default clips the falloff flush against the edge, which is exactly the hard
+                    // rectangle this exists to avoid.
+                    Modifier.blur(HALO_BLUR, BlurredEdgeTreatment.Unbounded)
+                } else {
+                    Modifier
+                }
+            )
+            .alpha(0.9f),
     )
 }
 
@@ -194,5 +184,10 @@ private fun sampledOptions(target: Int) = BitmapFactory.Options().apply {
  */
 private const val HALO_PIXELS = 6
 
-/** How far past the cover the halo spreads. */
-private const val HALO_SPREAD = 1.35f
+/**
+ * Matches the 60pt the iOS halo uses. Large relative to the cover on purpose: the blur *is* the
+ * spread here, since nothing scales the image up any more.
+ */
+private val HALO_BLUR = 64.dp
+
+
