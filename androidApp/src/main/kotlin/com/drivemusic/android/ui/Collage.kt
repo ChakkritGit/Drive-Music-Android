@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -44,7 +42,7 @@ fun ArtworkCollage(
     covers: List<ByteArray>,
     size: Dp,
     cornerRadius: Dp = 12.dp,
-    fallbackIcon: ImageVector = Icons.Default.MusicNote,
+    @androidx.annotation.DrawableRes fallbackIcon: Int = AppIcons.MusicNote,
 ) {
     val bitmaps = remember(covers) {
         covers.take(4).mapNotNull {
@@ -59,7 +57,7 @@ fun ArtworkCollage(
     ) {
         when {
             bitmaps.isEmpty() -> Icon(
-                fallbackIcon,
+painterResource(fallbackIcon),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.size(size / 3),
@@ -96,7 +94,7 @@ fun CollectionCard(
     title: String,
     subtitle: String,
     covers: List<ByteArray>,
-    fallbackIcon: ImageVector = Icons.Default.MusicNote,
+    @androidx.annotation.DrawableRes fallbackIcon: Int = AppIcons.MusicNote,
     onClick: () -> Unit,
 ) {
     Column(
@@ -131,7 +129,7 @@ fun SearchField(value: String, placeholder: String, onChange: (String) -> Unit) 
         placeholder = { Text(placeholder) },
         singleLine = true,
         leadingIcon = {
-            Icon(Icons.Default.Search, contentDescription = null)
+            Icon(painterResource(AppIcons.Search), contentDescription = null)
         },
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     )

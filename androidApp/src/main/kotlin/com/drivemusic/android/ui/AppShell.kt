@@ -19,15 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -66,11 +58,14 @@ import com.drivemusic.shared.model.DriveFile
  * Putting it in the bottom bar gives a rarely-used screen the same weight as the four the app is
  * actually for.
  */
-enum class Tab(@androidx.annotation.StringRes val labelRes: Int, val icon: ImageVector) {
-    HOME(R.string.home, Icons.Default.Home),
-    BROWSE(R.string.browse, Icons.Default.Folder),
-    PLAYLISTS(R.string.playlists, Icons.Default.PlaylistPlay),
-    LIBRARY(R.string.library, Icons.Default.LibraryMusic),
+enum class Tab(
+    @androidx.annotation.StringRes val labelRes: Int,
+    @androidx.annotation.DrawableRes val iconRes: Int,
+) {
+    HOME(R.string.home, AppIcons.Home),
+    BROWSE(R.string.browse, AppIcons.Folder),
+    PLAYLISTS(R.string.playlists, AppIcons.PlaylistPlay),
+    LIBRARY(R.string.library, AppIcons.LibraryMusic),
 }
 
 /** What is pushed on top of the current tab. */
@@ -180,7 +175,7 @@ private fun AppShellContent(
                 navigationIcon = {
                     if (pushed != null) {
                         IconButton(onClick = { pushed = null }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                            Icon(painterResource(AppIcons.ArrowBack), contentDescription = stringResource(R.string.back))
                         }
                     } else {
                         IconButton(onClick = { pushed = Pushed.Profile }) { ProfileAvatar(container) }
@@ -191,10 +186,10 @@ private fun AppShellContent(
                     // the bar belongs to that screen.
                     if (pushed == null) {
                         IconButton(onClick = { pushed = Pushed.Analytics }) {
-                            Icon(Icons.Default.Insights, contentDescription = stringResource(R.string.analytics))
+                            Icon(painterResource(AppIcons.Insights), contentDescription = stringResource(R.string.analytics))
                         }
                         IconButton(onClick = { pushed = Pushed.Settings }) {
-                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
+                            Icon(painterResource(AppIcons.Settings), contentDescription = stringResource(R.string.settings))
                         }
                     }
                 },
@@ -212,7 +207,7 @@ private fun AppShellContent(
                             // section would be the wrong place.
                             onClick = { tab = entry; pushed = null; query = "" },
                             icon = {
-                                Icon(entry.icon, contentDescription = stringResource(entry.labelRes))
+                                Icon(painterResource(entry.iconRes), contentDescription = stringResource(entry.labelRes))
                             },
                             label = { Text(stringResource(entry.labelRes)) },
                         )
@@ -315,8 +310,7 @@ private fun ProfileAvatar(container: AppContainer) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Icon(
-                Icons.Default.AccountCircle,
+            Icon(painterResource(AppIcons.AccountCircle),
                 contentDescription = stringResource(R.string.profile),
                 tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.fillMaxSize(),

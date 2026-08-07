@@ -10,6 +10,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -50,13 +51,13 @@ fun AppMenu(
 fun AppMenuItem(
     label: String,
     onClick: () -> Unit,
-    icon: ImageVector? = null,
+    @androidx.annotation.DrawableRes icon: Int? = null,
     tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     DropdownMenuItem(
         text = { Text(label, style = MaterialTheme.typography.bodyLarge) },
         onClick = onClick,
-        trailingIcon = icon?.let { { Icon(it, contentDescription = null, tint = tint) } },
+        trailingIcon = icon?.let { { Icon(painterResource(it), contentDescription = null, tint = tint) } },
         contentPadding = ITEM_PADDING,
         colors = MenuDefaults.itemColors(),
     )

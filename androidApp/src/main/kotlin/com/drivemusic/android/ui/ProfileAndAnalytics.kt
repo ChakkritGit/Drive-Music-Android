@@ -14,17 +14,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Contrast
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -40,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -111,7 +101,7 @@ fun ProfileScreen(
         SettingsSection(stringResource(R.string.preferences))
         SettingsGroup {
             ChoiceRow(
-                icon = Icons.Default.Contrast,
+                icon = AppIcons.Contrast,
                 label = stringResource(R.string.appearance),
                 options = AppTheme.entries.map { it to stringResource(it.labelRes) },
                 selected = theme,
@@ -125,7 +115,7 @@ fun ProfileScreen(
             SettingsDivider()
 
             ChoiceRow(
-                icon = Icons.Default.Language,
+                icon = AppIcons.Language,
                 label = stringResource(R.string.language),
                 options = AppLanguage.entries.map { it to it.nativeName },
                 selected = language,
@@ -143,10 +133,9 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(page.icon, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+                    Icon(painterResource(page.icon), contentDescription = null, tint = MaterialTheme.colorScheme.outline)
                     Text(stringResource(page.titleRes), modifier = Modifier.weight(1f))
-                    Icon(
-                        Icons.AutoMirrored.Filled.OpenInNew,
+                    Icon(painterResource(AppIcons.OpenInNew),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.outline,
                     )
@@ -163,8 +152,7 @@ fun ProfileScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Logout,
+                Icon(painterResource(AppIcons.Logout),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
                 )
@@ -194,10 +182,10 @@ fun ProfileScreen(
 enum class LegalPage(
     @androidx.annotation.StringRes val titleRes: Int,
     val url: String,
-    val icon: ImageVector,
+    @androidx.annotation.DrawableRes val icon: Int,
 ) {
-    PRIVACY(R.string.privacy_policy, "https://drive-music-taupe.vercel.app/privacy", Icons.Default.Shield),
-    TERMS(R.string.terms_of_service, "https://drive-music-taupe.vercel.app/terms", Icons.Default.Description),
+    PRIVACY(R.string.privacy_policy, "https://drive-music-taupe.vercel.app/privacy", AppIcons.Shield),
+    TERMS(R.string.terms_of_service, "https://drive-music-taupe.vercel.app/terms", AppIcons.Description),
 }
 
 /**
@@ -228,8 +216,7 @@ private fun Avatar(url: String?, size: androidx.compose.ui.unit.Dp) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Icon(
-                Icons.Default.AccountCircle,
+            Icon(painterResource(AppIcons.AccountCircle),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.fillMaxSize(),
@@ -248,7 +235,7 @@ private fun Avatar(url: String?, size: androidx.compose.ui.unit.Dp) {
  */
 @Composable
 private fun <T> ChoiceRow(
-    icon: ImageVector,
+    @androidx.annotation.DrawableRes icon: Int,
     label: String,
     options: List<Pair<T, String>>,
     selected: T,
@@ -261,7 +248,7 @@ private fun <T> ChoiceRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+        Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.outline)
         Text(label, modifier = Modifier.weight(1f))
 
         Box {
@@ -271,8 +258,7 @@ private fun <T> ChoiceRow(
                     color = MaterialTheme.colorScheme.outline,
                 )
                 Icon(
-                    // Rotates to point up while open, so the control says which way it will go.
-                    if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                    painterResource(if (expanded) AppIcons.ArrowDropUp else AppIcons.ArrowDropDown),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.outline,
                 )
@@ -282,7 +268,7 @@ private fun <T> ChoiceRow(
                     AppMenuItem(
                         label = title,
                         onClick = { onSelect(value); expanded = false },
-                        icon = Icons.Default.Check.takeIf { value == selected },
+                        icon = AppIcons.Check.takeIf { value == selected },
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }

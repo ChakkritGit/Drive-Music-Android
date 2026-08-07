@@ -20,25 +20,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
@@ -76,11 +62,11 @@ fun CollectionActions(onPlay: () -> Unit, onShuffle: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Button(onClick = onPlay) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null)
+            Icon(painterResource(AppIcons.PlayArrow), contentDescription = null)
             Text(stringResource(R.string.play), modifier = Modifier.padding(start = 4.dp))
         }
         OutlinedButton(onClick = onShuffle) {
-            Icon(Icons.Default.Shuffle, contentDescription = null)
+            Icon(painterResource(AppIcons.Shuffle), contentDescription = null)
             Text(stringResource(R.string.shuffle), modifier = Modifier.padding(start = 4.dp))
         }
     }
@@ -108,8 +94,7 @@ private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Icon(
-                Icons.Default.MusicNote,
+            Icon(painterResource(AppIcons.MusicNote),
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.outline,
@@ -175,12 +160,12 @@ fun MiniPlayer(
                 }
                 IconButton(onClick = viewModel::togglePlayPause) {
                     Icon(
-                        if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        painterResource(if (state.isPlaying) AppIcons.Pause else AppIcons.PlayArrow),
                         contentDescription = stringResource(if (state.isPlaying) R.string.pause else R.string.play),
                     )
                 }
                 IconButton(onClick = viewModel::next) {
-                    Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.next))
+                    Icon(painterResource(AppIcons.SkipNext), contentDescription = stringResource(R.string.next))
                 }
             }
         }
@@ -217,7 +202,7 @@ fun NowPlayingScreen(
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.close))
+                Icon(painterResource(AppIcons.KeyboardArrowDown), contentDescription = stringResource(R.string.close))
             }
             Spacer(modifier = Modifier.weight(1f))
             Text(
@@ -258,7 +243,7 @@ fun NowPlayingScreen(
                 )
                 IconButton(onClick = { viewModel.toggleFavorite(track) }) {
                     Icon(
-                        if (state.isCurrentFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        painterResource(if (state.isCurrentFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder),
                         contentDescription = stringResource(R.string.favourite),
                         tint = if (state.isCurrentFavorite) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.outline,
@@ -316,8 +301,7 @@ fun NowPlayingScreen(
             horizontalArrangement = Arrangement.End,
         ) {
             IconButton(onClick = { queueOpen = true }, enabled = state.upNext.isNotEmpty()) {
-                Icon(
-                    Icons.AutoMirrored.Filled.List,
+                Icon(painterResource(AppIcons.List),
                     contentDescription = stringResource(R.string.queue),
                     tint = MaterialTheme.colorScheme.outline,
                 )
@@ -344,8 +328,7 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = viewModel::toggleShuffle, modifier = Modifier.size(44.dp)) {
-            Icon(
-                Icons.Default.Shuffle,
+            Icon(painterResource(AppIcons.Shuffle),
                 contentDescription = stringResource(R.string.shuffle),
                 tint = if (state.queue.shuffle) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.outline,
@@ -356,7 +339,7 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
             enabled = state.currentTrack != null,
             modifier = Modifier.size(52.dp),
         ) {
-            Icon(Icons.Default.SkipPrevious, contentDescription = stringResource(R.string.prev), modifier = Modifier.size(34.dp))
+            Icon(painterResource(AppIcons.SkipPrevious), contentDescription = stringResource(R.string.prev), modifier = Modifier.size(34.dp))
         }
 
         Box(
@@ -370,7 +353,7 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
                 modifier = Modifier.size(72.dp),
             ) {
                 Icon(
-                    if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    painterResource(if (state.isPlaying) AppIcons.Pause else AppIcons.PlayArrow),
                     contentDescription = stringResource(if (state.isPlaying) R.string.pause else R.string.play),
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(38.dp),
@@ -383,11 +366,11 @@ private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerV
             enabled = state.currentTrack != null,
             modifier = Modifier.size(52.dp),
         ) {
-            Icon(Icons.Default.SkipNext, contentDescription = stringResource(R.string.next), modifier = Modifier.size(34.dp))
+            Icon(painterResource(AppIcons.SkipNext), contentDescription = stringResource(R.string.next), modifier = Modifier.size(34.dp))
         }
         IconButton(onClick = viewModel::cycleLoopMode, modifier = Modifier.size(44.dp)) {
             Icon(
-                if (state.queue.loopMode == LoopMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                painterResource(if (state.queue.loopMode == LoopMode.ONE) AppIcons.RepeatOne else AppIcons.Repeat),
                 contentDescription = stringResource(R.string.repeat),
                 tint = if (state.queue.loopMode == LoopMode.OFF) MaterialTheme.colorScheme.outline
                 else MaterialTheme.colorScheme.primary,
@@ -463,7 +446,7 @@ private fun QueueSheet(
                         isDownloaded = entry.file.id in state.downloadedIds,
                         onClick = { viewModel.jumpTo(entry.index); onDismiss() },
                         onQueue = { viewModel.removeFromQueue(entry.index) },
-                        queueIcon = Icons.Default.Close,
+                        queueIcon = AppIcons.Close,
                         queueLabel = stringResource(R.string.remove_from_queue),
                     )
                 }

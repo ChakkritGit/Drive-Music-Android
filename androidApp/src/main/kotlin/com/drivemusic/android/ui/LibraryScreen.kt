@@ -14,14 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.QueuePlayNext
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -39,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
@@ -148,7 +141,7 @@ fun SortMenu(current: TrackSort, onSelect: (TrackSort) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { expanded = true }) {
-            Icon(Icons.Default.Sort, contentDescription = null)
+            Icon(painterResource(AppIcons.Sort), contentDescription = null)
             Text(stringResource(current.labelRes), modifier = Modifier.padding(start = 4.dp))
         }
         AppMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -156,7 +149,7 @@ fun SortMenu(current: TrackSort, onSelect: (TrackSort) -> Unit) {
                 AppMenuItem(
                     label = stringResource(option.labelRes),
                     onClick = { onSelect(option); expanded = false },
-                    icon = Icons.Default.Check.takeIf { option == current },
+                    icon = AppIcons.Check.takeIf { option == current },
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -193,8 +186,7 @@ fun ArtworkThumb(viewModel: PlayerViewModel, track: CachedTrack, size: Dp) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Icon(
-                Icons.Default.MusicNote,
+            Icon(painterResource(AppIcons.MusicNote),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.size(size / 2.5f),
@@ -241,20 +233,20 @@ fun CachedTrackRow(
         }
         Box {
             IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
+                Icon(painterResource(AppIcons.MoreVert), contentDescription = stringResource(R.string.more))
             }
             AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 onQueue?.let {
-                    AppMenuItem(stringResource(R.string.play_next), { it(); menuOpen = false }, Icons.Default.QueuePlayNext)
+                    AppMenuItem(stringResource(R.string.play_next), { it(); menuOpen = false }, AppIcons.QueuePlayNext)
                 }
                 onAddToPlaylist?.let {
-                    AppMenuItem(stringResource(R.string.add_to_playlist), { it(); menuOpen = false }, Icons.Default.PlaylistAdd)
+                    AppMenuItem(stringResource(R.string.add_to_playlist), { it(); menuOpen = false }, AppIcons.PlaylistAdd)
                 }
                 onRemoveDownload?.let {
                     AppMenuItem(
                         stringResource(R.string.remove_download),
                         { it(); menuOpen = false },
-                        Icons.Default.Delete,
+                        AppIcons.Delete,
                         tint = MaterialTheme.colorScheme.error,
                     )
                 }

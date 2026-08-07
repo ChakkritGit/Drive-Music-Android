@@ -11,15 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.QueuePlayNext
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -35,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -92,7 +84,7 @@ fun BrowseScreen(
         ) {
             if (stack.size > 1) {
                 IconButton(onClick = { stack = stack.dropLast(1) }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    Icon(painterResource(AppIcons.ArrowBack), contentDescription = stringResource(R.string.back))
                 }
             }
             Text(
@@ -128,7 +120,7 @@ fun BrowseScreen(
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 } else {
-                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(painterResource(AppIcons.Download), contentDescription = null, modifier = Modifier.size(18.dp))
                     Text(
                         if (remaining == 0) stringResource(R.string.all_downloaded)
                         else stringResource(R.string.download_all_lld, remaining),
@@ -183,7 +175,7 @@ private fun FolderRow(file: DriveFile, onOpen: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Icon(painterResource(AppIcons.Folder), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Text(file.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -195,7 +187,7 @@ fun TrackRow(
     isPlaying: Boolean = false,
     onClick: () -> Unit,
     onQueue: (() -> Unit)? = null,
-    queueIcon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.Add,
+    @androidx.annotation.DrawableRes queueIcon: Int = AppIcons.Add,
     queueLabel: String? = null,
 ) {
     Row(
@@ -203,8 +195,7 @@ fun TrackRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Icon(
-            Icons.Default.MusicNote,
+        Icon(painterResource(AppIcons.MusicNote),
             contentDescription = null,
             tint = if (isPlaying) MaterialTheme.colorScheme.primary else Color.Gray,
             modifier = Modifier.size(20.dp),
@@ -227,7 +218,7 @@ fun TrackRow(
         }
         if (onQueue != null) {
             IconButton(onClick = onQueue) {
-                Icon(queueIcon, contentDescription = queueLabel ?: stringResource(R.string.play_next))
+                Icon(painterResource(queueIcon), contentDescription = queueLabel ?: stringResource(R.string.play_next))
             }
         }
     }
@@ -249,8 +240,7 @@ private fun BrowseTrackRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Icon(
-            Icons.Default.MusicNote,
+        Icon(painterResource(AppIcons.MusicNote),
             contentDescription = null,
             tint = Color.Gray,
             modifier = Modifier.size(20.dp),
@@ -267,14 +257,14 @@ private fun BrowseTrackRow(
         }
         Box {
             IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
+                Icon(painterResource(AppIcons.MoreVert), contentDescription = stringResource(R.string.more))
             }
             AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                AppMenuItem(stringResource(R.string.play_next), { onQueue(); menuOpen = false }, Icons.Default.QueuePlayNext)
+                AppMenuItem(stringResource(R.string.play_next), { onQueue(); menuOpen = false }, AppIcons.QueuePlayNext)
                 AppMenuItem(
                     stringResource(R.string.add_to_playlist),
                     { onAddToPlaylist(); menuOpen = false },
-                    Icons.Default.PlaylistAdd,
+                    AppIcons.PlaylistAdd,
                 )
             }
         }

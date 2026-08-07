@@ -11,12 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +21,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
@@ -81,7 +76,7 @@ fun HomeScreen(
     ) {
         if (state.recentSources.isNotEmpty()) {
             item {
-                Shelf(stringResource(R.string.recently_played), Icons.Default.Schedule) {
+                Shelf(stringResource(R.string.recently_played), AppIcons.Schedule) {
                     items(state.recentSources, key = { it.source.id }) { recent ->
                         // Resolved here, in the composable, rather than inside `onClick` — a
                         // click handler is not a composition and cannot read resources.
@@ -112,7 +107,7 @@ fun HomeScreen(
                             title = playlist.name,
                             subtitle = trackCount(playlist.tracks.size),
                             tracks = playlist.tracks,
-                            fallbackIcon = Icons.Default.Favorite,
+                            fallbackIcon = AppIcons.Favorite,
                             onClick = {
                                 onOpenCollection(
                                     Collection(
@@ -138,7 +133,7 @@ fun HomeScreen(
                 val madeForYouTitle = stringResource(R.string.made_for_you)
                 val basedOnListening = stringResource(R.string.based_on_your_listening)
 
-                Shelf(stringResource(R.string.recommended_for_you), Icons.Default.AutoAwesome) {
+                Shelf(stringResource(R.string.recommended_for_you), AppIcons.AutoAwesome) {
                     item {
                         CollectionCardFor(
                             viewModel, shuffleAllTitle, allDownloaded, shuffleAll,
@@ -170,7 +165,7 @@ fun HomeScreen(
         val artists = state.artists
         if (artists.isNotEmpty()) {
             item {
-                Shelf(stringResource(R.string.artists), Icons.Default.Mic) {
+                Shelf(stringResource(R.string.artists), AppIcons.Mic) {
                     items(artists, key = { it.first }) { (artist, tracks) ->
                         val files = tracks.map { it.driveMeta }
                         CollectionCardFor(
@@ -178,7 +173,7 @@ fun HomeScreen(
                             title = artist,
                             subtitle = trackCount(tracks.size),
                             tracks = files,
-                            fallbackIcon = Icons.Default.Mic,
+                            fallbackIcon = AppIcons.Mic,
                             onClick = { onOpenCollection(Collection(artist, "Artist", files, null)) },
                         )
                     }
@@ -199,7 +194,7 @@ data class Collection(
 @Composable
 private fun Shelf(
     title: String,
-    icon: ImageVector?,
+    @androidx.annotation.DrawableRes icon: Int?,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     Column {
@@ -209,7 +204,7 @@ private fun Shelf(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             icon?.let {
-                Icon(it, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
+                Icon(painterResource(it), contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
             }
             Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.outline)
         }
@@ -228,7 +223,7 @@ fun CollectionCardFor(
     title: String,
     subtitle: String,
     tracks: List<DriveFile>,
-    fallbackIcon: ImageVector = Icons.Default.MusicNote,
+    @androidx.annotation.DrawableRes fallbackIcon: Int = AppIcons.MusicNote,
     onClick: () -> Unit,
 ) {
     val covers by produceState(initialValue = emptyList<ByteArray>(), tracks.take(4).map { it.id }) {
