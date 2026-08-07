@@ -1,6 +1,7 @@
 package com.drivemusic.android.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,129 +41,105 @@ import com.drivemusic.shared.model.PlaySource
 import com.drivemusic.shared.model.Playlist
 
 @Composable
-fun PlaylistsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
-    var openPlaylist by remember { mutableStateOf<String?>(null) }
-    var creating by remember { mutableStateOf(false) }
+fun PlaylistsScreen(
+    state: PlayerViewModel.UiState,
+    viewModel: PlayerViewModel,
+    query: String,
+    onOpen: (Collection) -> Unit,
+) {
+    var newName by remember { mutableStateOf("") }
 
-    val selected = state.playlists.firstOrNull { it.id == openPlaylist }
-    if (selected != null) {
-        PlaylistDetail(selected, state, viewModel) { openPlaylist = null }
-        return
+    val visible = remember(state.playlists, query) {
+        val normalized = query.trim().lowercase()
+        if (normalized.isEmpty()) state.playlists
+        else state.playlists.filter { it.name.lowercase().contains(normalized) }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Inline creation rather than a dialog behind a "+" — matches iOS, and making a playlist
+        // is the thing this screen is for.
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Playlists", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-            IconButton(onClick = { creating = true }) {
-                Icon(Icons.Default.Add, contentDescription = "New playlist")
+            OutlinedTextField(
+                value = newName,
+                onValueChange = { newName = it },
+                placeholder = { Text("New playlist name…") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = { viewModel.createPlaylist(newName.trim()); newName = "" },
+                enabled = newName.isNotBlank(),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Text("Create")
             }
         }
 
         if (state.playlists.isEmpty()) {
             EmptyState(
-                title = "No playlists yet",
-                message = "Create one, then add tracks from your library or from Drive.",
+                "No playlists yet",
+                "Create one above, or add a track to a new playlist from Browse.",
             )
+        } else if (visible.isEmpty()) {
+            EmptyState("No matches", "No playlists match \"$query\".")
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-                items(state.playlists, key = { it.id }) { playlist ->
-                    ListItem(
-                        headlineContent = { Text(playlist.name) },
-                        supportingContent = { Text("${playlist.tracks.size} tracks") },
-                        trailingContent = {
-                            IconButton(onClick = { viewModel.deletePlaylist(playlist.id) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete")
-                            }
+                items(visible, key = { it.id }) { playlist ->
+                    PlaylistRow(
+                        viewModel = viewModel,
+                        playlist = playlist,
+                        onOpen = {
+                            onOpen(
+                                Collection(
+                                    playlist.name,
+                                    trackCount(playlist.tracks.size),
+                                    playlist.tracks,
+                                    PlaySource(playlist.id, playlist.name, PlaySource.Kind.PLAYLIST),
+                                )
+                            )
                         },
-                        modifier = Modifier.clickable { openPlaylist = playlist.id },
+                        onDelete = { viewModel.deletePlaylist(playlist.id) },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
             }
         }
     }
-
-    if (creating) {
-        NameDialog(
-            title = "New playlist",
-            onDismiss = { creating = false },
-            onConfirm = { viewModel.createPlaylist(it); creating = false },
-        )
-    }
 }
 
+/** A playlist row with the same 2×2 collage the Home cards use, at row scale. */
 @Composable
-private fun PlaylistDetail(
-    playlist: Playlist,
-    state: PlayerViewModel.UiState,
+private fun PlaylistRow(
     viewModel: PlayerViewModel,
-    onBack: () -> Unit,
+    playlist: Playlist,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
 ) {
-    val source = remember(playlist.id) {
-        PlaySource(playlist.id, playlist.name, PlaySource.Kind.PLAYLIST)
-    }
+    val covers by androidx.compose.runtime.produceState(
+        initialValue = emptyList<ByteArray>(),
+        playlist.id,
+        playlist.tracks.size,
+    ) { value = viewModel.coversFor(playlist.tracks) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ArtworkCollage(covers, size = 52.dp, cornerRadius = 8.dp)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                playlist.name,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-            )
-        }
-
-        if (playlist.tracks.isEmpty()) {
-            EmptyState("Empty playlist", "Add tracks from your library or while browsing Drive.")
-            return
-        }
-
-        CollectionActions(
-            onPlay = { viewModel.play(playlist.tracks, 0, source) },
-            onShuffle = { viewModel.shufflePlay(playlist.tracks, source) },
-        )
-        Row(modifier = Modifier.padding(horizontal = 16.dp)) {
-            TextButton(onClick = { viewModel.downloadAll(playlist.tracks) }) {
-                Text("Download all")
-            }
-        }
-        state.downloadProgress?.let { (done, total) ->
-            Text(
-                "Downloading $done of $total",
+                trackCount(playlist.tracks.size),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outline,
             )
         }
-
-        LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-            items(playlist.tracks, key = { it.id }) { file ->
-                TrackRow(
-                    file = file,
-                    isDownloaded = file.id in state.downloadedIds,
-                    isPlaying = state.currentTrack?.id == file.id,
-                    onClick = {
-                        viewModel.play(
-                            playlist.tracks,
-                            playlist.tracks.indexOfFirst { it.id == file.id },
-                            source,
-                        )
-                    },
-                    onQueue = { viewModel.removeFromPlaylist(playlist.id, file.id) },
-                    queueIcon = Icons.Default.Delete,
-                    queueLabel = "Remove from playlist",
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.Delete, contentDescription = "Delete playlist")
         }
     }
 }

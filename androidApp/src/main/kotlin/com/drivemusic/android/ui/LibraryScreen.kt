@@ -62,20 +62,26 @@ import com.drivemusic.shared.model.PlaySource
 fun LibraryScreen(
     state: PlayerViewModel.UiState,
     viewModel: PlayerViewModel,
+    query: String,
     onAddToPlaylist: (com.drivemusic.shared.model.DriveFile) -> Unit,
 ) {
     var sort by remember { mutableStateOf(TrackSort.RECENTLY_ADDED) }
 
-    val sorted = remember(state.cachedTracks, sort) {
+    val matching = remember(state.cachedTracks, query) {
+        val normalized = query.trim().lowercase()
+        if (normalized.isEmpty()) state.cachedTracks
+        else state.cachedTracks.filter { track ->
+            listOfNotNull(track.displayTitle, track.parsedMeta.artist, track.parsedMeta.album)
+                .any { it.lowercase().contains(normalized) }
+        }
+    }
+
+    val sorted = remember(matching, sort) {
         when (sort) {
-            TrackSort.NAME -> state.cachedTracks.sortedBy { it.displayTitle.lowercase() }
-            TrackSort.RECENTLY_ADDED -> state.cachedTracks.sortedByDescending { it.cachedAt }
-            TrackSort.ARTIST -> state.cachedTracks.sortedBy {
-                (it.parsedMeta.artist ?: "￿").lowercase()
-            }
-            TrackSort.ALBUM -> state.cachedTracks.sortedBy {
-                (it.parsedMeta.album ?: "￿").lowercase()
-            }
+            TrackSort.NAME -> matching.sortedBy { it.displayTitle.lowercase() }
+            TrackSort.RECENTLY_ADDED -> matching.sortedByDescending { it.cachedAt }
+            TrackSort.ARTIST -> matching.sortedBy { (it.parsedMeta.artist ?: "￿").lowercase() }
+            TrackSort.ALBUM -> matching.sortedBy { (it.parsedMeta.album ?: "￿").lowercase() }
         }
     }
     val queue = remember(sorted) { sorted.map { it.driveMeta } }
@@ -91,10 +97,15 @@ fun LibraryScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Library", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+            Text(
+                "Downloaded — available offline",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.weight(1f),
+            )
             SortMenu(sort) { sort = it }
         }
         Text(

@@ -4,6 +4,7 @@ import com.drivemusic.shared.model.CachedTrack
 import com.drivemusic.shared.model.DriveFile
 import com.drivemusic.shared.model.PlaybackSession
 import com.drivemusic.shared.model.Playlist
+import com.drivemusic.shared.model.RecentSource
 import com.drivemusic.shared.recommendation.ListeningModel
 
 /**
@@ -34,6 +35,10 @@ interface TrackLibrary {
     suspend fun deletePlaylist(id: String)
     suspend fun addTrackToPlaylist(id: String, file: DriveFile)
     suspend fun removeTrackFromPlaylist(id: String, fileId: String)
+
+    /** Folders and playlists played recently, most recent first — the Home shelf. */
+    suspend fun listRecentSources(limit: Int = 10): List<RecentSource>
+    suspend fun recordRecentSource(source: com.drivemusic.shared.model.PlaySource, tracks: List<DriveFile>)
 
     suspend fun loadPlaybackSession(): PlaybackSession?
     suspend fun savePlaybackSession(session: PlaybackSession)

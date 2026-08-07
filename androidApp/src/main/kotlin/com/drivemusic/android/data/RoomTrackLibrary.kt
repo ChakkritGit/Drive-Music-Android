@@ -5,7 +5,9 @@ import com.drivemusic.shared.model.CachedTrack
 import com.drivemusic.shared.model.DriveFile
 import com.drivemusic.shared.model.ParsedMetadata
 import com.drivemusic.shared.model.PlaybackSession
+import com.drivemusic.shared.model.PlaySource
 import com.drivemusic.shared.model.Playlist
+import com.drivemusic.shared.model.RecentSource
 import com.drivemusic.shared.recommendation.ListeningModel
 import com.drivemusic.shared.recommendation.RecommendationModel
 import kotlinx.coroutines.Dispatchers
@@ -110,6 +112,37 @@ class RoomTrackLibrary(
         dao.putPlaylist(existing.copy(tracks = existing.tracks.filter { it.id != fileId }).toEntity())
     }
 
+    override suspend fun listRecentSources(limit: Int): List<RecentSource> = io {
+        dao.singleton(KEY_RECENTS)
+            ?.let { runCatching { json.decodeFromString(RECENTS, it) }.getOrNull() }
+            ?.sortedByDescending { it.lastPlayedAt }
+            ?.take(limit)
+            ?: emptyList()
+    }
+
+    /**
+     * Records a play. Kept as one JSON blob rather than a table: it is a short list that is always
+     * read whole, and the only query anyone makes of it is "the most recent few".
+     */
+    override suspend fun recordRecentSource(source: PlaySource, tracks: List<DriveFile>) = io {
+        val existing = dao.singleton(KEY_RECENTS)
+            ?.let { runCatching { json.decodeFromString(RECENTS, it) }.getOrNull() }
+            ?: emptyList()
+        val previous = existing.firstOrNull { it.source.id == source.id }
+        val updated = existing.filterNot { it.source.id == source.id } + RecentSource(
+            source = source,
+            tracks = tracks.take(40),
+            lastPlayedAt = kotlinx.datetime.Clock.System.now(),
+            playCount = (previous?.playCount ?: 0) + 1,
+        )
+        dao.putSingleton(
+            SingletonEntity(
+                KEY_RECENTS,
+                json.encodeToString(RECENTS, updated.sortedByDescending { it.lastPlayedAt }.take(20)),
+            )
+        )
+    }
+
     override suspend fun loadPlaybackSession(): PlaybackSession? = io {
         dao.singleton(KEY_SESSION)?.let {
             runCatching { json.decodeFromString(PlaybackSession.serializer(), it) }.getOrNull()
@@ -152,6 +185,8 @@ class RoomTrackLibrary(
     private companion object {
         const val KEY_SESSION = "session"
         const val KEY_MODEL = "model"
+        const val KEY_RECENTS = "recent-sources"
+        val RECENTS = kotlinx.serialization.builtins.ListSerializer(RecentSource.serializer())
         val TRACKS = kotlinx.serialization.builtins.ListSerializer(DriveFile.serializer())
     }
 }

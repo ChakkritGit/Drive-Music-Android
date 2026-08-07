@@ -18,6 +18,7 @@ import com.drivemusic.shared.model.LoopMode
 import com.drivemusic.shared.model.ParsedMetadata
 import com.drivemusic.shared.model.PlaySource
 import com.drivemusic.shared.model.Playlist
+import com.drivemusic.shared.model.RecentSource
 import com.drivemusic.shared.model.PlaybackSession
 import com.drivemusic.shared.playback.PlaybackQueue
 import com.drivemusic.shared.playback.PlaybackQueueState
@@ -71,6 +72,7 @@ class PlayerViewModel(
         val downloadedIds: Set<String> = emptySet(),
         val cachedTracks: List<CachedTrack> = emptyList(),
         val playlists: List<Playlist> = emptyList(),
+        val recentSources: List<RecentSource> = emptyList(),
         val cacheBytes: Long = 0,
         val downloadProgress: Pair<Int, Int>? = null,
     ) {
@@ -147,6 +149,7 @@ class PlayerViewModel(
         val withoutShuffle = PlaybackQueue.setShuffle(_state.value.queue, false, weightsFor(tracks))
         val queue = PlaybackQueue.play(withoutShuffle, tracks, startIndex, weightsFor(tracks))
         _state.update { it.copy(queue = queue, source = source) }
+        recordSource(source, tracks)
         loadCurrent(autoplay = true)
     }
 
@@ -156,7 +159,16 @@ class PlayerViewModel(
         val shuffled = PlaybackQueue.setShuffle(_state.value.queue, true, weights)
         val queue = PlaybackQueue.play(shuffled, tracks, start, weights)
         _state.update { it.copy(queue = queue, source = source) }
+        recordSource(source, tracks)
         loadCurrent(autoplay = true)
+    }
+
+    private fun recordSource(source: PlaySource?, tracks: List<DriveFile>) {
+        if (source == null || tracks.isEmpty()) return
+        viewModelScope.launch {
+            library.recordRecentSource(source, tracks)
+            _state.update { it.copy(recentSources = library.listRecentSources()) }
+        }
     }
 
     fun togglePlayPause() {
@@ -272,6 +284,7 @@ class PlayerViewModel(
                     cachedTracks = library.listCachedTracks(),
                     downloadedIds = library.listCachedTrackIds(),
                     playlists = library.listPlaylists(),
+                    recentSources = library.listRecentSources(),
                     cacheBytes = files.totalBytes(),
                 )
             }
@@ -351,6 +364,21 @@ class PlayerViewModel(
 
     /** Cover art for one track, by id — never carried on the track itself. */
     suspend fun artworkFor(fileId: String): ByteArray? = library.artwork(fileId)
+
+    /**
+     * Up to four covers for a collection's collage.
+     *
+     * Stops as soon as it has four rather than reading every track: a shelf of a dozen cards would
+     * otherwise pull the artwork of the entire library to draw twelve thumbnails.
+     */
+    suspend fun coversFor(tracks: List<DriveFile>, limit: Int = 4): List<ByteArray> {
+        val result = mutableListOf<ByteArray>()
+        for (file in tracks) {
+            library.artwork(file.id)?.let(result::add)
+            if (result.size >= limit) break
+        }
+        return result
+    }
 
     /** The tracks the model thinks the listener wants right now — the Home "Made for you" shelf. */
     fun recommended(limit: Int = 12): List<CachedTrack> {
