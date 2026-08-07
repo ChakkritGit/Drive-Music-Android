@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.ExperimentalMaterial3Api
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -129,53 +131,78 @@ private val CARD_SIZE = 160.dp
  */
 private val SEARCH_SHAPE = RoundedCornerShape(28.dp)
 
-@Composable
-private fun searchColors() = androidx.compose.material3.TextFieldDefaults.colors(
-    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    // The pill's own edge is the boundary; an indicator line under it draws a second one.
-    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-    disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-)
+/** The pill's height. Shorter than a stock `TextField`'s 56dp, which is sized for a floating
+ * label this control does not have — the placeholder is the label, and the spare vertical space
+ * just pushed the results further down the screen. */
+private val SEARCH_HEIGHT = 44.dp
 
-/** The single search field used by every list screen. */
+/**
+ * The single search field used by every list screen.
+ *
+ * Built from a [BasicTextField] inside the same pill [SearchButton] draws, rather than from a
+ * Material `TextField`: `TextField` enforces its own minimum height and internal padding, which is
+ * what made the two controls different sizes and the bar taller than it needed to be.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchField(
     value: String,
     placeholder: String,
     modifier: Modifier = Modifier,
-    trailing: @Composable (() -> Unit)? = null,
+    contentPadding: Dp = 16.dp,
     keyboardOptions: androidx.compose.foundation.text.KeyboardOptions =
         androidx.compose.foundation.text.KeyboardOptions.Default,
     keyboardActions: androidx.compose.foundation.text.KeyboardActions =
         androidx.compose.foundation.text.KeyboardActions.Default,
     onChange: (String) -> Unit,
 ) {
-    androidx.compose.material3.TextField(
-        value = value,
-        onValueChange = onChange,
-        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.outline) },
-        singleLine = true,
+    androidx.compose.material3.Surface(
         shape = SEARCH_SHAPE,
-        colors = searchColors(),
-        leadingIcon = {
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier.fillMaxWidth().height(SEARCH_HEIGHT).padding(horizontal = contentPadding),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Icon(
                 painterResource(AppIcons.Search),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(20.dp),
             )
-        },
-        trailingIcon = trailing,
-        keyboardOptions = keyboardOptions,
-        keyboardActions = keyboardActions,
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-    )
+            androidx.compose.foundation.text.BasicTextField(
+                value = value,
+                onValueChange = onChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge
+                    .copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = keyboardOptions,
+                keyboardActions = keyboardActions,
+                modifier = Modifier.weight(1f).padding(start = 12.dp),
+                decorationBox = { inner ->
+                    // `BasicTextField` has no placeholder of its own, so it is drawn behind the
+                    // text and hidden once there is any.
+                    if (value.isEmpty()) {
+                        Text(
+                            placeholder,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.outline,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    inner()
+                },
+            )
+        }
+    }
 }
 
 /**
- * A search field that is not one yet: it looks exactly like [SearchField] but only navigates.
+ * A search field that is not one yet: it wears exactly the same pill as [SearchField] but only
+ * navigates.
  *
  * Used where searching means leaving for a screen of its own, so the affordance is honest about
  * being a button while still promising the thing it leads to.
@@ -186,16 +213,17 @@ fun SearchButton(placeholder: String, modifier: Modifier = Modifier, onClick: ()
         onClick = onClick,
         shape = SEARCH_SHAPE,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().height(SEARCH_HEIGHT),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 painterResource(AppIcons.Search),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(20.dp),
             )
             Text(
                 placeholder,

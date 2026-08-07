@@ -1,6 +1,9 @@
 package com.drivemusic.android.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
@@ -35,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -192,14 +196,36 @@ private fun AppShellContent(
                     // two have swapped. Search is wanted from any scroll position, so it is the
                     // one that earns the pinned row; a greeting is not.
                     if (pushed == Pushed.Search) {
-                        SearchField(
-                            value = query,
-                            placeholder = stringResource(R.string.search_your_music),
-                            modifier = Modifier.focusRequester(searchFocus),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                            onChange = { query = it },
-                        )
+                        // Field and clear button share the title slot rather than sitting on
+                        // opposite sides of the bar's title/actions boundary — that boundary
+                        // reserves its own spacing, which is what pushed them apart and shoved
+                        // the button into the screen edge.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SearchField(
+                                value = query,
+                                placeholder = stringResource(R.string.search_your_music),
+                                modifier = Modifier.weight(1f).focusRequester(searchFocus),
+                                contentPadding = 0.dp,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                                onChange = { query = it },
+                            )
+                            // The button grows out of the trailing edge and the field gives up
+                            // exactly that width, so the pill visibly contracts and expands rather
+                            // than jumping between two sizes a frame apart.
+                            AnimatedVisibility(
+                                visible = query.isNotEmpty(),
+                                enter = expandHorizontally(tween(180)) + fadeIn(tween(180)),
+                                exit = shrinkHorizontally(tween(180)) + fadeOut(tween(120)),
+                            ) {
+                                IconButton(onClick = { query = "" }) {
+                                    Icon(
+                                        painterResource(AppIcons.Close),
+                                        contentDescription = stringResource(R.string.clear),
+                                    )
+                                }
+                            }
+                        }
                     } else if (pushed == null && tab == Tab.HOME) {
                         SearchButton(
                             placeholder = stringResource(R.string.search_your_music),
@@ -220,19 +246,6 @@ private fun AppShellContent(
                     }
                 },
                 actions = {
-                    // Clearing sits beside the field rather than inside it. Inside, it is a third
-                    // icon crowding a pill that already carries a magnifier and the text itself,
-                    // and it eats the field's own width; beside it, it lands where the bar's other
-                    // buttons live and is the same size as them. It appears only once there is
-                    // something to clear — a permanent one would be a button that does nothing.
-                    if (pushed == Pushed.Search && query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }) {
-                            Icon(
-                                painterResource(AppIcons.Close),
-                                contentDescription = stringResource(R.string.clear),
-                            )
-                        }
-                    }
                     // The header buttons stay on the top-level screens only — inside a pushed one
                     // the bar belongs to that screen.
                     if (pushed == null) {
