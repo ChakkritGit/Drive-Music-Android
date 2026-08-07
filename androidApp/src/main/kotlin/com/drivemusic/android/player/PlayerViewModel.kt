@@ -81,11 +81,15 @@ class PlayerViewModel(
         val currentTrack: DriveFile? get() = queue.currentTrack
 
         /** Whether the playing track is in the Favourites playlist. */
-        val isCurrentFavorite: Boolean
-            get() {
-                val id = currentTrack?.id ?: return false
-                return playlists.firstOrNull { it.name == FAVORITES }?.tracks?.any { it.id == id } == true
-            }
+        val isCurrentFavorite: Boolean get() = isFavorite(currentTrack?.id)
+
+        fun isFavorite(fileId: String?): Boolean {
+            val id = fileId ?: return false
+            return playlists.firstOrNull { it.name == FAVORITES }?.tracks?.any { it.id == id } == true
+        }
+
+        /** Downloaded tracks by id, for rows that need metadata and artwork for one file. */
+        val cachedById: Map<String, CachedTrack> get() = cachedTracks.associateBy { it.fileId }
         val upNext get() = PlaybackQueue.upNext(queue)
 
         /**

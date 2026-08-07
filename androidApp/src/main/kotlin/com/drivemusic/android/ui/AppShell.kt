@@ -74,6 +74,7 @@ private sealed interface Pushed {
     data object Settings : Pushed
     data object Profile : Pushed
     data object Analytics : Pushed
+    data object Search : Pushed
 }
 
 /**
@@ -168,6 +169,8 @@ private fun AppShellContent(
         Pushed.Settings -> stringResource(R.string.settings)
         Pushed.Profile -> stringResource(R.string.profile)
         Pushed.Analytics -> stringResource(R.string.analytics)
+        // The field itself says what this screen is; a title above it would repeat that.
+        Pushed.Search -> ""
         null -> null
     }
 
@@ -254,6 +257,13 @@ private fun AppShellContent(
                     Pushed.Settings -> SettingsScreen(state, viewModel)
                     Pushed.Profile -> ProfileScreen(container, state, onThemeChange, onSignOut)
                     Pushed.Analytics -> AnalyticsScreen(state)
+                    Pushed.Search -> SearchScreen(
+                        state = state,
+                        viewModel = viewModel,
+                        query = query,
+                        onQueryChange = { query = it },
+                        onAddToPlaylist = { addingToPlaylist = it },
+                    )
 
                     null -> Column(modifier = Modifier.fillMaxSize()) {
                         AnimatedContent(
@@ -267,12 +277,13 @@ private fun AppShellContent(
                                 Tab.HOME -> HomeScreen(
                                     state = state,
                                     viewModel = viewModel,
-                                    query = query,
-                                    onQueryChange = { query = it },
+                                    onOpenSearch = { query = ""; pushed = Pushed.Search },
                                 ) { pushed = Pushed.CollectionDetail(it) }
 
                                 Tab.BROWSE -> BrowseScreen(
                                     drive = container.drive,
+                                    playerState = state,
+                                    viewModel = viewModel,
                                     downloadedIds = state.downloadedIds,
                                     onPlay = viewModel::play,
                                     onShuffle = { tracks, source -> viewModel.shufflePlay(tracks, source) },

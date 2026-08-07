@@ -140,16 +140,16 @@ fun LibraryScreen(
             }
         }
         items(sorted, key = { it.fileId }) { track ->
-                CachedTrackRow(
+                TrackListRow(
+                    file = track.driveMeta,
+                    cachedTrack = track,
+                    state = state,
                     viewModel = viewModel,
-                    track = track,
-                    isPlaying = state.currentTrack?.id == track.fileId,
                     onClick = {
                         viewModel.play(queue, queue.indexOfFirst { it.id == track.fileId }, source)
                     },
                     onAddToPlaylist = { onAddToPlaylist(track.driveMeta) },
-                    onQueue = { viewModel.addToQueue(track.driveMeta) },
-                    onRemoveDownload = { viewModel.removeDownload(track.fileId) },
+                    onRemove = { viewModel.removeDownload(track.fileId) },
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         }

@@ -55,6 +55,7 @@ fun CollectionDetailScreen(
                 .any { it.lowercase().contains(normalized) }
         }
     }
+    val cachedById = remember(state.cachedTracks) { state.cachedById }
     val remaining = collection.tracks.count { it.id !in state.downloadedIds }
     val progress = state.downloadProgress
 
@@ -81,10 +82,11 @@ fun CollectionDetailScreen(
                 Note(stringResource(R.string.no_tracks_match, query))
             }
             else -> items(visible, key = { it.id }) { file ->
-                TrackRow(
+                TrackListRow(
                     file = file,
-                    isDownloaded = file.id in state.downloadedIds,
-                    isPlaying = state.currentTrack?.id == file.id,
+                    cachedTrack = cachedById[file.id],
+                    state = state,
+                    viewModel = viewModel,
                     onClick = {
                         viewModel.play(
                             collection.tracks,
@@ -92,9 +94,7 @@ fun CollectionDetailScreen(
                             collection.source,
                         )
                     },
-                    onQueue = { onAddToPlaylist(file) },
-                    queueIcon = AppIcons.PlaylistAdd,
-                    queueLabel = stringResource(R.string.add_to_playlist),
+                    onAddToPlaylist = { onAddToPlaylist(file) },
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }

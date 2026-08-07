@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.drivemusic.android.R
+import com.drivemusic.android.player.PlayerViewModel
 import com.drivemusic.shared.drive.DriveApiClient
 import com.drivemusic.shared.model.DriveFile
 import com.drivemusic.shared.model.PlaySource
@@ -49,6 +50,8 @@ data class Crumb(val id: String, val name: String)
 @Composable
 fun BrowseScreen(
     drive: DriveApiClient,
+    playerState: PlayerViewModel.UiState,
+    viewModel: PlayerViewModel,
     downloadedIds: Set<String>,
     onPlay: (List<DriveFile>, Int, PlaySource) -> Unit,
     onShuffle: (List<DriveFile>, PlaySource) -> Unit,
@@ -75,6 +78,7 @@ fun BrowseScreen(
     }
 
     val audioFiles = remember(items) { items.filterNot { it.isFolder } }
+    val cachedById = remember(playerState.cachedTracks) { playerState.cachedById }
     val source = remember(current) { PlaySource(current.id, current.name, PlaySource.Kind.FOLDER) }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -153,11 +157,12 @@ fun BrowseScreen(
                     if (file.isFolder) {
                         FolderRow(file) { stack = stack + Crumb(file.id, file.displayName) }
                     } else {
-                        BrowseTrackRow(
+                        TrackListRow(
                             file = file,
-                            isDownloaded = file.id in downloadedIds,
+                            cachedTrack = cachedById[file.id],
+                            state = playerState,
+                            viewModel = viewModel,
                             onClick = { onPlay(audioFiles, audioFiles.indexOfFirst { it.id == file.id }, source) },
-                            onQueue = { onQueue(file) },
                             onAddToPlaylist = { onAddToPlaylist(file) },
                         )
                     }
@@ -219,53 +224,6 @@ fun TrackRow(
         if (onQueue != null) {
             IconButton(onClick = onQueue) {
                 Icon(painterResource(queueIcon), contentDescription = queueLabel ?: stringResource(R.string.play_next))
-            }
-        }
-    }
-}
-
-/** A browse row with the overflow menu the library rows have. */
-@Composable
-private fun BrowseTrackRow(
-    file: DriveFile,
-    isDownloaded: Boolean,
-    onClick: () -> Unit,
-    onQueue: () -> Unit,
-    onAddToPlaylist: () -> Unit,
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Icon(painterResource(AppIcons.MusicNote),
-            contentDescription = null,
-            tint = Color.Gray,
-            modifier = Modifier.size(20.dp),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(file.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (isDownloaded) {
-                Text(
-                    stringResource(R.string.downloaded),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-            }
-        }
-        Box {
-            IconButton(onClick = { menuOpen = true }) {
-                Icon(painterResource(AppIcons.MoreVert), contentDescription = stringResource(R.string.more))
-            }
-            AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                AppMenuItem(stringResource(R.string.play_next), { onQueue(); menuOpen = false }, AppIcons.QueuePlayNext)
-                AppMenuItem(
-                    stringResource(R.string.add_to_playlist),
-                    { onAddToPlaylist(); menuOpen = false },
-                    AppIcons.PlaylistAdd,
-                )
             }
         }
     }

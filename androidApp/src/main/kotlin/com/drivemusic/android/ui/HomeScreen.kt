@@ -11,7 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,21 +45,16 @@ import com.drivemusic.shared.model.PlaySource
 fun HomeScreen(
     state: PlayerViewModel.UiState,
     viewModel: PlayerViewModel,
-    query: String,
-    onQueryChange: (String) -> Unit,
+    onOpenSearch: () -> Unit,
     onOpenCollection: (Collection) -> Unit,
 ) {
-    if (query.isNotBlank()) {
-        SearchResults(state, viewModel, query, onQueryChange)
-        return
-    }
 
     val hasAnything = state.cachedTracks.isNotEmpty() || state.playlists.isNotEmpty() ||
         state.recentSources.isNotEmpty()
 
     if (!hasAnything) {
         Column(modifier = Modifier.fillMaxSize()) {
-            HomeSearchField(query, onQueryChange)
+            SearchButton(onOpenSearch)
             EmptyState(
                 message = stringResource(R.string.nothing_to_show_yet_head_to_browse_to_play_something_from_yo),
             )
@@ -88,8 +84,8 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         // First item, not a fixed header: it scrolls away with the shelves and comes back on the
-        // way up, which is what `.searchable` does on iOS.
-        item { HomeSearchField(query, onQueryChange) }
+        // way up.
+        item { SearchButton(onOpenSearch) }
 
         if (state.recentSources.isNotEmpty()) {
             item {
@@ -260,51 +256,6 @@ fun CollectionCardFor(
 }
 
 @Composable
-private fun SearchResults(
-    state: PlayerViewModel.UiState,
-    viewModel: PlayerViewModel,
-    query: String,
-    onQueryChange: (String) -> Unit,
-) {
-    val normalized = query.trim().lowercase()
-    val matches = remember(state.cachedTracks, normalized) {
-        state.cachedTracks.filter { track ->
-            listOfNotNull(
-                track.displayTitle, track.parsedMeta.artist, track.parsedMeta.album,
-            ).any { it.lowercase().contains(normalized) }
-        }
-    }
-
-    if (matches.isEmpty()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            HomeSearchField(query, onQueryChange)
-            EmptyState(message = stringResource(R.string.no_tracks_match, query))
-        }
-        return
-    }
-
-    // The queue is the *whole* downloaded set, not just the matches — playing a search result
-    // should carry on into the rest of the library rather than stopping dead at the end of a
-    // filter the user has already forgotten about.
-    val queue = remember(state.cachedTracks) { state.cachedTracks.map { it.driveMeta } }
-    val source = remember { PlaySource("__library__", "", PlaySource.Kind.LIBRARY) }
-
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item { HomeSearchField(query, onQueryChange) }
-        items(matches, key = { it.fileId }) { track ->
-            CachedTrackRow(
-                viewModel = viewModel,
-                track = track,
-                isPlaying = state.currentTrack?.id == track.fileId,
-                onClick = { viewModel.play(queue, queue.indexOfFirst { it.id == track.fileId }, source) },
-                onQueue = { viewModel.addToQueue(track.driveMeta) },
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-        }
-    }
-}
-
-@Composable
 private fun sourceLabel(kind: PlaySource.Kind) = stringResource(
     when (kind) {
         PlaySource.Kind.PLAYLIST -> R.string.playlist
@@ -355,9 +306,37 @@ fun EmptyState(message: String, title: String? = null) {
     }
 }
 
+/**
+ * Opens search rather than being a field itself.
+ *
+ * A live field here would need the shelves to become results as you type, which is two screens
+ * fighting over one list. A button says plainly that searching goes somewhere.
+ */
 @Composable
-private fun HomeSearchField(query: String, onQueryChange: (String) -> Unit) {
-    SearchField(query, stringResource(R.string.search_your_music), onQueryChange)
+private fun SearchButton(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                painterResource(AppIcons.Search),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+            )
+            Text(
+                stringResource(R.string.search_your_music),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
+    }
 }
 
 /** How many items a browse shelf shows. */

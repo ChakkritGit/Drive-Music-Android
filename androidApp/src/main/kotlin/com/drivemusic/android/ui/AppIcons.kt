@@ -23,6 +23,7 @@ object AppIcons {
     @DrawableRes val ArrowDropUp = R.drawable.ic_arrow_drop_up
     @DrawableRes val AutoAwesome = R.drawable.ic_auto_awesome
     @DrawableRes val Check = R.drawable.ic_check
+    @DrawableRes val CloudDone = R.drawable.ic_cloud_done
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val Contrast = R.drawable.ic_contrast
     @DrawableRes val Delete = R.drawable.ic_delete
@@ -30,7 +31,9 @@ object AppIcons {
     @DrawableRes val Download = R.drawable.ic_download
     @DrawableRes val Favorite = R.drawable.ic_favorite
     @DrawableRes val FavoriteBorder = R.drawable.ic_favorite_border
+    @DrawableRes val Equalizer = R.drawable.ic_equalizer
     @DrawableRes val Folder = R.drawable.ic_folder
+    @DrawableRes val HeartBroken = R.drawable.ic_heart_broken
     @DrawableRes val Home = R.drawable.ic_home
     @DrawableRes val Insights = R.drawable.ic_insights
     @DrawableRes val KeyboardArrowDown = R.drawable.ic_keyboard_arrow_down
