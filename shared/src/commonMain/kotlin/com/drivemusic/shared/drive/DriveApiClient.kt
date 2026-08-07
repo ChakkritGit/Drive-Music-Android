@@ -1,6 +1,7 @@
 package com.drivemusic.shared.drive
 
 import com.drivemusic.shared.data.AccessTokenProvider
+import com.drivemusic.shared.data.AudioSink
 import com.drivemusic.shared.model.DriveFile
 import com.drivemusic.shared.model.FOLDER_MIME_TYPE
 import io.ktor.client.HttpClient
@@ -9,9 +10,11 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.utils.io.readAvailable
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
-import io.ktor.client.statement.readRawBytes
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.delay
@@ -129,14 +132,34 @@ class DriveApiClient(
         }
     }
 
-    /** The raw bytes of an audio file. */
-    suspend fun downloadFile(fileId: String): ByteArray {
+    /**
+     * Streams an audio file to [sink] in blocks.
+     *
+     * Streamed rather than returned as a `ByteArray`. Reading the body whole meant a track's
+     * entire size had to be allocated as one contiguous array before any of it could be written to
+     * disk — a 53MB track asking for 53MB of a heap with 25MB left, which is how this crashed. The
+     * bytes are on their way to a file; there is no moment where all of them need to exist at
+     * once.
+     *
+     * A retried attempt starts the transfer again from the beginning, so [sink] must be prepared
+     * to be written to more than once — [AudioFileStore.store] truncates for exactly this reason.
+     */
+    suspend fun downloadFile(fileId: String, sink: AudioSink) {
         val token = tokens.freshAccessToken()
-        return withRetry {
-            http.get("$FILES_ENDPOINT/$fileId") {
+        withRetry {
+            http.prepareGet("$FILES_ENDPOINT/$fileId") {
                 header("Authorization", "Bearer $token")
                 parameter("alt", "media")
-            }.orThrow().readRawBytes()
+            }.execute { response ->
+                response.orThrow()
+                val channel = response.bodyAsChannel()
+                val buffer = ByteArray(DOWNLOAD_BLOCK)
+                while (true) {
+                    val read = channel.readAvailable(buffer, 0, buffer.size)
+                    if (read <= 0) break
+                    sink.write(buffer, read)
+                }
+            }
         }
     }
 
@@ -165,6 +188,10 @@ class DriveApiClient(
 
         /** Belt to the `pageToken` echo guard above; a real library never comes close. */
         private const val MAX_PAGES = 100
+
+        /** One read from the network per block. Large enough to keep syscalls cheap, small
+         * enough that the buffer is nothing next to a track. */
+        private const val DOWNLOAD_BLOCK = 64 * 1024
 
         /** Lenient decoding — Drive adds fields, and an unknown one must not fail a whole page. */
         fun defaultJson(): Json = Json { ignoreUnknownKeys = true; explicitNulls = false }

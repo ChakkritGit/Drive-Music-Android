@@ -29,6 +29,7 @@ import com.drivemusic.shared.analysis.TrackAnalyzer
 import com.drivemusic.shared.model.TrackAnalysis
 import com.drivemusic.shared.transition.TransitionPlan
 import com.drivemusic.shared.transition.TransitionSettings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import java.io.File
 
@@ -567,8 +569,10 @@ class PlayerViewModel(
     private suspend fun ensureCached(file: DriveFile): CachedTrack {
         library.getCachedTrack(file.id)?.let { return it }
 
-        val bytes = drive.downloadFile(file.id)
-        val relativePath = files.store(bytes, file)
+        // Streamed straight to disk. The bytes are on their way to a file, so there is no moment
+        // where the whole track needs to exist in memory — which is what used to kill the process
+        // on a large one.
+        val relativePath = files.store(file) { sink -> drive.downloadFile(file.id, sink) }
         val uri = files.uri(relativePath)
         val (metadata, artwork) = readTags(uri)
 
@@ -589,9 +593,16 @@ class PlayerViewModel(
     }
 
     /** Tags and cover art from the downloaded file, via the platform extractor. */
-    private fun readTags(uri: String): Pair<ParsedMetadata, ByteArray?> {
+    /**
+     * Reads a file's tags and embedded cover.
+     *
+     * On the IO dispatcher, not the caller's. This opens the file, parses its container and pulls
+     * out a cover that is routinely hundreds of kilobytes — none of which belongs on the thread
+     * drawing the screen, and all of which used to happen there.
+     */
+    private suspend fun readTags(uri: String): Pair<ParsedMetadata, ByteArray?> = withContext(Dispatchers.IO) {
         val retriever = MediaMetadataRetriever()
-        return try {
+        try {
             retriever.setDataSource(File(java.net.URI(uri)).absolutePath)
             val metadata = ParsedMetadata(
                 title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE),

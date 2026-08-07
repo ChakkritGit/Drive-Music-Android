@@ -19,6 +19,7 @@ object AppIcons {
     @DrawableRes val AccountCircle = R.drawable.ic_account_circle
     @DrawableRes val Add = R.drawable.ic_add
     @DrawableRes val ArrowBack = R.drawable.ic_arrow_back
+    @DrawableRes val ChevronRight = R.drawable.ic_chevron_right
     @DrawableRes val ArrowDropDown = R.drawable.ic_arrow_drop_down
     @DrawableRes val ArrowDropUp = R.drawable.ic_arrow_drop_up
     @DrawableRes val AutoAwesome = R.drawable.ic_auto_awesome

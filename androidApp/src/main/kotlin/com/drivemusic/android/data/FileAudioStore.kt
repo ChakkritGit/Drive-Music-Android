@@ -2,8 +2,10 @@ package com.drivemusic.android.data
 
 import android.content.Context
 import com.drivemusic.shared.data.AudioFileStore
+import com.drivemusic.shared.data.AudioSink
 import com.drivemusic.shared.model.DriveFile
 import java.io.File
+import java.io.FileOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,17 +27,30 @@ class FileAudioStore(context: Context) : AudioFileStore {
         return if (extension.isEmpty()) id else "$id.$extension"
     }
 
-    override suspend fun store(data: ByteArray, file: DriveFile): String = withContext(Dispatchers.IO) {
-        val name = safeName(file)
-        // Written to a temporary file and moved into place, so a download interrupted halfway
-        // never leaves a truncated file that looks cached and plays as a fragment.
-        val temporary = File(root, "$name.part")
-        temporary.writeBytes(data)
-        val target = File(root, name)
-        if (target.exists()) target.delete()
-        temporary.renameTo(target)
-        name
-    }
+    override suspend fun store(file: DriveFile, body: suspend (AudioSink) -> Unit): String =
+        withContext(Dispatchers.IO) {
+            val name = safeName(file)
+            // Written to a temporary file and moved into place, so a download interrupted halfway
+            // never leaves a truncated file that looks cached and plays as a fragment.
+            val temporary = File(root, "$name.part")
+            try {
+                // Truncating, not appending: a retried transfer restarts from the first byte, and
+                // appending would splice the second attempt onto the remains of the first.
+                FileOutputStream(temporary, false).use { output ->
+                    body { bytes, count -> output.write(bytes, 0, count) }
+                    output.fd.sync()
+                }
+                val target = File(root, name)
+                if (target.exists()) target.delete()
+                temporary.renameTo(target)
+            } catch (error: Throwable) {
+                // A half-written `.part` left behind would be picked up as the destination of the
+                // next attempt and, worse, counts toward the cache size the user is shown.
+                temporary.delete()
+                throw error
+            }
+            name
+        }
 
     /**
      * The file itself, for the analyser.

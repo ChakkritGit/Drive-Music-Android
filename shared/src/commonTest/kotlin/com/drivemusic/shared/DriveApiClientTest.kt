@@ -143,9 +143,36 @@ class DriveApiClientTest {
     }
 
     @Test
-    fun downloadsRawBytes() = runTest {
+    fun streamsTheFileToTheSink() = runTest {
         val engine = MockEngine { respond(byteArrayOf(1, 2, 3, 4), HttpStatusCode.OK) }
-        assertEquals(listOf<Byte>(1, 2, 3, 4), client(engine).downloadFile("a").toList())
+        val received = mutableListOf<Byte>()
+        client(engine).downloadFile("a") { bytes, count ->
+            // Only the first `count` bytes of the block are part of the file — the buffer is
+            // reused and whatever the previous read left past that point is stale.
+            received += bytes.take(count)
+        }
+        assertEquals(listOf<Byte>(1, 2, 3, 4), received)
+    }
+
+    /**
+     * A retried transfer restarts from the first byte, so a sink that appends would splice the
+     * second attempt onto the remains of the first. The store truncates for this reason; this
+     * pins the behaviour that makes truncating necessary.
+     */
+    @Test
+    fun aRetriedDownloadStartsOverFromTheBeginning() = runTest {
+        var call = 0
+        val engine = MockEngine {
+            call++
+            if (call == 1) respond("", HttpStatusCode.ServiceUnavailable)
+            else respond(byteArrayOf(9, 8, 7), HttpStatusCode.OK)
+        }
+        val blocks = mutableListOf<List<Byte>>()
+        client(engine, DriveApiClient.RetryPolicy(maxAttempts = 3, initialDelayMs = 1))
+            .downloadFile("a") { bytes, count -> blocks += bytes.take(count) }
+
+        assertEquals(2, call)
+        assertEquals(listOf(listOf<Byte>(9, 8, 7)), blocks)
     }
 
     /** Drive adds fields over time; an unknown one must not fail the whole page. */

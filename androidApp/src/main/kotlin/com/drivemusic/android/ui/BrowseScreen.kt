@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -82,23 +83,12 @@ fun BrowseScreen(
     val source = remember(current) { PlaySource(current.id, current.name, PlaySource.Kind.FOLDER) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (stack.size > 1) {
-                IconButton(onClick = { stack = stack.dropLast(1) }) {
-                    Icon(painterResource(AppIcons.ArrowBack), contentDescription = stringResource(R.string.back))
-                }
-            }
-            Text(
-                current.name,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-            )
-        }
+        Breadcrumbs(
+            stack = stack.mapIndexed { index, crumb ->
+                if (index == 0 && crumb.name.isEmpty()) crumb.copy(name = rootName) else crumb
+            },
+            onSelect = { depth -> stack = stack.take(depth + 1) },
+        )
 
         if (audioFiles.isNotEmpty()) {
             CollectionActions(
@@ -225,6 +215,65 @@ fun TrackRow(
             IconButton(onClick = onQueue) {
                 Icon(painterResource(queueIcon), contentDescription = queueLabel ?: stringResource(R.string.play_next))
             }
+        }
+    }
+}
+
+/**
+ * The path from the root to where you are, each level tappable.
+ *
+ * A back arrow only offers the level immediately above. Drive folders nest as deep as a person
+ * feels like nesting them, and climbing out of a five-deep path one tap at a time — reloading a
+ * folder listing at every step — is the difference between a browser and a maze. It also answers
+ * the question the title alone cannot: "Music" tells you where you are, not how you got there or
+ * what "back" means.
+ *
+ * Horizontally scrollable, ending at the current folder: a deep path outgrows the screen, and it
+ * is the tail — where you are — that has to stay visible, so it starts scrolled to the end.
+ */
+@Composable
+private fun Breadcrumbs(stack: List<Crumb>, onSelect: (Int) -> Unit) {
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    // Scrolled to the end whenever the path changes, so descending keeps the folder you just
+    // opened in view rather than leaving it off the right edge.
+    androidx.compose.runtime.LaunchedEffect(stack.size) {
+        if (stack.isNotEmpty()) listState.animateScrollToItem(stack.lastIndex)
+    }
+
+    androidx.compose.foundation.lazy.LazyRow(
+        state = listState,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        itemsIndexed(stack) { index, crumb ->
+            if (index > 0) {
+                Icon(
+                    painterResource(AppIcons.ChevronRight),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(16.dp).padding(horizontal = 2.dp),
+                )
+            }
+            val isCurrent = index == stack.lastIndex
+            Text(
+                crumb.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isCurrent) FontWeight.Medium else FontWeight.Normal,
+                color = if (isCurrent) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    // The current folder is where you already are; leaving it tappable offers a
+                    // move that does nothing.
+                    .then(
+                        if (isCurrent) Modifier
+                        else Modifier.clickable { onSelect(index) }
+                    )
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+            )
         }
     }
 }

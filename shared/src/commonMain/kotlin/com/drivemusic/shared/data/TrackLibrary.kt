@@ -63,10 +63,23 @@ interface TrackLibrary {
     suspend fun clearAll()
 }
 
+/** Somewhere to write bytes as they arrive, so a track is never held in memory whole. */
+fun interface AudioSink {
+    suspend fun write(bytes: ByteArray, count: Int)
+}
+
 /** Where the downloaded audio actually lives. */
 interface AudioFileStore {
-    /** Writes [data] for [file] and returns its path relative to the store root. */
-    suspend fun store(data: ByteArray, file: DriveFile): String
+    /**
+     * Opens a file for [file], hands [body] a sink to fill, and returns the path relative to the
+     * store root.
+     *
+     * Takes a writer rather than a `ByteArray`, because the array was the problem: a track is tens
+     * of megabytes, the whole thing had to be resident and contiguous before a single byte reached
+     * the disk, and a large one killed the process outright. Nothing needs the whole file at once
+     * — it is being written to a file.
+     */
+    suspend fun store(file: DriveFile, body: suspend (AudioSink) -> Unit): String
 
     /** An absolute URI the audio player can open. */
     suspend fun uri(relativePath: String): String
