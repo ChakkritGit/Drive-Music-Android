@@ -25,13 +25,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
 import com.drivemusic.android.R
 import com.drivemusic.android.audio.EqSettings
 import com.drivemusic.android.player.PlayerViewModel
 import kotlin.math.roundToInt
 
 @Composable
-fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
+fun PlaybackSettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
     var confirmingWipe by remember { mutableStateOf(false) }
 
     Column(
@@ -49,8 +55,9 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
             SliderRow(
                 title = stringResource(R.string.length),
                 value = state.crossfadeSeconds.toFloat(),
-                range = 2f..20f,
-                display = "${state.crossfadeSeconds.roundToInt()}s",
+                range = 0f..PlayerViewModel.MAX_CROSSFADE_SECONDS.toFloat(),
+                steps = CROSSFADE_STEPS,
+                display = "%.1fs".format(state.crossfadeSeconds),
                 onChange = { viewModel.setCrossfadeSeconds(it.toDouble()) },
             )
             SwitchRow(
@@ -142,6 +149,75 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
         }
         }
 
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+/**
+ * The settings root: two rows, matching iOS.
+ *
+ * One flat screen made "what a mix sounds like" and "delete everything permanently" neighbours in
+ * the same scroll. Splitting them means the destructive action lives somewhere you have to mean to
+ * go, rather than somewhere you land while looking for the crossfade length.
+ */
+@Composable
+fun SettingsScreen(onOpenPlayback: () -> Unit, onOpenData: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        SettingsGroup(modifier = Modifier.padding(top = 12.dp)) {
+            NavigationRow(
+                title = stringResource(R.string.playback),
+                icon = AppIcons.GraphicEq,
+                onClick = onOpenPlayback,
+            )
+            SettingsDivider()
+            NavigationRow(
+                title = stringResource(R.string.data),
+                icon = AppIcons.Storage,
+                onClick = onOpenData,
+            )
+        }
+    }
+}
+
+/** A row that leads somewhere. */
+@Composable
+private fun NavigationRow(title: String, @androidx.annotation.DrawableRes icon: Int, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painterResource(icon),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp),
+        )
+        Text(
+            title,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f).padding(start = 16.dp),
+        )
+        Icon(
+            painterResource(AppIcons.ChevronRight),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+/**
+ * On-device storage: what is stored, and the one action that removes it.
+ *
+ * Deliberately not padded out with settings that merely relate to data — iOS makes the same call —
+ * so the destructive button is not surrounded by things people came here to adjust. The size is
+ * here because it is what the button deletes, not because it is adjustable.
+ */
+@Composable
+fun DataSettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
+    var confirmingWipe by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         SettingsSection(stringResource(R.string.storage))
         SettingsGroup {
             Text(
@@ -208,6 +284,7 @@ private fun SliderRow(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     display: String,
+    steps: Int = 0,
     onChange: (Float) -> Unit,
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -215,7 +292,7 @@ private fun SliderRow(
             Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Text(display, style = MaterialTheme.typography.bodyMedium)
         }
-        Slider(value = value, onValueChange = onChange, valueRange = range)
+        Slider(value = value, onValueChange = onChange, valueRange = range, steps = steps)
     }
 }
 
@@ -229,3 +306,11 @@ private fun EqBand(label: String, valueDb: Double, onChange: (Double) -> Unit) {
         onChange = { onChange(it.toDouble()) },
     )
 }
+
+/**
+ * Half-second stops across the crossfade range, matching the iOS slider's `step: 0.5`.
+ *
+ * `steps` counts the stops *between* the ends, which is why this is one less than the number of
+ * half-seconds in the range.
+ */
+private const val CROSSFADE_STEPS = (PlayerViewModel.MAX_CROSSFADE_SECONDS * 2).toInt() - 1

@@ -19,9 +19,20 @@ class SettingsStore(context: Context) {
         get() = preferences.getBoolean(CROSSFADE_ENABLED, true)
         set(value) = preferences.edit().putBoolean(CROSSFADE_ENABLED, value).apply()
 
+    /**
+     * Clamped on read as well as on write. Builds before the ceiling existed allowed 20s, and a
+     * stored value past it would otherwise be read back at every launch — the setting would look
+     * fixed while behaving exactly as it did before.
+     */
     var crossfadeSeconds: Double
         get() = preferences.getFloat(CROSSFADE_SECONDS, 8f).toDouble()
-        set(value) = preferences.edit().putFloat(CROSSFADE_SECONDS, value.toFloat()).apply()
+            .coerceIn(0.0, PlayerViewModel.MAX_CROSSFADE_SECONDS)
+        set(value) = preferences.edit()
+            .putFloat(
+                CROSSFADE_SECONDS,
+                value.coerceIn(0.0, PlayerViewModel.MAX_CROSSFADE_SECONDS).toFloat(),
+            )
+            .apply()
 
     var autoMixEnabled: Boolean
         get() = preferences.getBoolean(AUTO_MIX, true)

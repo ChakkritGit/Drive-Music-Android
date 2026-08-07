@@ -83,9 +83,24 @@ enum class Tab(
 private sealed interface Pushed {
     data class CollectionDetail(val collection: Collection) : Pushed
     data object Settings : Pushed
+    data object PlaybackSettings : Pushed
+    data object DataSettings : Pushed
     data object Profile : Pushed
     data object Analytics : Pushed
     data object Search : Pushed
+
+    /**
+     * Where Back goes from here, or null to leave the pushed stack entirely.
+     *
+     * `Pushed` holds one screen rather than a stack, which was fine while every pushed screen sat
+     * directly on a tab. The settings sub-screens are one level deeper, and without this Back from
+     * Playback left Settings altogether instead of returning to it.
+     */
+    val parent: Pushed?
+        get() = when (this) {
+            PlaybackSettings, DataSettings -> Settings
+            else -> null
+        }
 }
 
 /**
@@ -191,11 +206,15 @@ private fun AppShellContent(
 
     // Android's Back gesture pops a pushed screen before leaving the app, same as the iOS
     // NavigationStack it mirrors.
-    androidx.activity.compose.BackHandler(enabled = pushed != null) { onPushedChange(null) }
+    androidx.activity.compose.BackHandler(enabled = pushed != null) {
+        onPushedChange(pushed?.parent)
+    }
 
     val pushedTitle = when (pushed) {
         is Pushed.CollectionDetail -> (pushed as Pushed.CollectionDetail).collection.title
         Pushed.Settings -> stringResource(R.string.settings)
+        Pushed.PlaybackSettings -> stringResource(R.string.playback)
+        Pushed.DataSettings -> stringResource(R.string.data)
         Pushed.Profile -> stringResource(R.string.profile)
         Pushed.Analytics -> stringResource(R.string.analytics)
         // The field is the title on this screen, so there is nothing else to put here.
@@ -244,7 +263,7 @@ private fun AppShellContent(
                 },
                 navigationIcon = {
                     if (pushed != null) {
-                        IconButton(onClick = { onPushedChange(null) }) {
+                        IconButton(onClick = { onPushedChange(pushed?.parent) }) {
                             Icon(painterResource(AppIcons.ArrowBack), contentDescription = stringResource(R.string.back))
                         }
                     } else {
@@ -311,7 +330,12 @@ private fun AppShellContent(
                         onAddToPlaylist = { addingToPlaylist = it },
                     )
 
-                    Pushed.Settings -> SettingsScreen(state, viewModel)
+                    Pushed.Settings -> SettingsScreen(
+                        onOpenPlayback = { onPushedChange(Pushed.PlaybackSettings) },
+                        onOpenData = { onPushedChange(Pushed.DataSettings) },
+                    )
+                    Pushed.PlaybackSettings -> PlaybackSettingsScreen(state, viewModel)
+                    Pushed.DataSettings -> DataSettingsScreen(state, viewModel)
                     Pushed.Profile -> ProfileScreen(container, state, onThemeChange, onSignOut)
                     Pushed.Analytics -> AnalyticsScreen(state)
                     Pushed.Search -> SearchScreen(

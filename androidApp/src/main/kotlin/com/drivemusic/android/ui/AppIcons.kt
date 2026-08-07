@@ -20,6 +20,8 @@ object AppIcons {
     @DrawableRes val Add = R.drawable.ic_add
     @DrawableRes val ArrowBack = R.drawable.ic_arrow_back
     @DrawableRes val ChevronRight = R.drawable.ic_chevron_right
+    @DrawableRes val GraphicEq = R.drawable.ic_graphic_eq
+    @DrawableRes val Storage = R.drawable.ic_storage
     @DrawableRes val ArrowDropDown = R.drawable.ic_arrow_drop_down
     @DrawableRes val ArrowDropUp = R.drawable.ic_arrow_drop_up
     @DrawableRes val AutoAwesome = R.drawable.ic_auto_awesome

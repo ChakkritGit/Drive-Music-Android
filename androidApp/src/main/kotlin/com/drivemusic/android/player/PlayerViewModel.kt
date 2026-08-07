@@ -359,8 +359,11 @@ class PlayerViewModel(
     }
 
     fun setCrossfadeSeconds(seconds: Double) {
-        settings.crossfadeSeconds = seconds
-        _state.update { it.copy(crossfadeSeconds = seconds) }
+        // Clamped here rather than only in the slider: the stored value outlives the control that
+        // set it, and one already past the ceiling would survive every launch after.
+        val clamped = seconds.coerceIn(0.0, MAX_CROSSFADE_SECONDS)
+        settings.crossfadeSeconds = clamped
+        _state.update { it.copy(crossfadeSeconds = clamped) }
     }
 
     fun setGaplessEnabled(enabled: Boolean) {
@@ -843,6 +846,15 @@ class PlayerViewModel(
 
         /** The spatial slider's ceiling, matching iOS's `maxSpatialIntensity`. */
         const val MAX_SPATIAL_INTENSITY = 100.0
+
+        /**
+         * The longest a crossfade may be, matching iOS's `maxCrossfadeSeconds`.
+         *
+         * The Android slider allowed 20s, so the two platforms disagreed about what the same
+         * setting means — and a 20s value written here would be read back on iOS as something it
+         * would never have produced.
+         */
+        const val MAX_CROSSFADE_SECONDS = 12.0
     }
 
     override fun onCleared() {
