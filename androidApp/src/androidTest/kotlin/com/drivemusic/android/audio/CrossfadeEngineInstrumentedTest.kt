@@ -185,6 +185,111 @@ class CrossfadeEngineInstrumentedTest {
         }
     }
 
+    /**
+     * The Rise preset holds the outgoing track's last bar under the transition. This checks the
+     * mechanism rather than the sound: the outgoing player ends up looping a clipped region, and
+     * its position therefore stays inside that region instead of running past it.
+     */
+    @Test
+    fun anOutgoingLoopHoldsThePlayerInsideItsRegion() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        val engine = withContextMain { CrossfadeEngine(context, scope) }
+        val a = writeTone("loop-a.wav", 220.0, 30.0)
+        val b = writeTone("loop-b.wav", 330.0, 10.0)
+
+        try {
+            withContextMain {
+                engine.prepare(PlaybackSlot.A, a.toURI().toString())
+                engine.player(PlaybackSlot.A).playWhenReady = true
+            }
+            awaitState(engine.player(PlaybackSlot.A), Player.STATE_READY)
+
+            // Two seconds of the outgoing track, held for a six-second transition — long enough
+            // that a player not actually looping would run well past the end of the region.
+            val plan = TransitionPlan.resolve(
+                settings = TransitionSettings(
+                    shape = TransitionPreset.RISE.shape,
+                    outgoingStartSeconds = 10.0,
+                ),
+                outgoing = null,
+                incoming = null,
+                outgoingDuration = null,
+                fallbackDuration = 6.0,
+                autoMixEnabled = true,
+                beatmatchEnabledByDefault = false,
+            ).copy(outgoingLoop = 8.0..10.0)
+
+            withContextMain {
+                engine.prepare(PlaybackSlot.B, b.toURI().toString())
+                engine.startTransition(plan)
+            }
+
+            delay(3_000)
+            val position = withContextMain { engine.player(PlaybackSlot.A).currentPosition }
+            val repeatMode = withContextMain { engine.player(PlaybackSlot.A).repeatMode }
+
+            assertEquals(Player.REPEAT_MODE_ONE, repeatMode)
+            assertTrue(
+                position in 0..2_500,
+                "position was ${position}ms — outside a 2s clipped loop, so it is not looping"
+            )
+
+            withTimeout(15_000) {
+                while (withContextMain { engine.isTransitioning }) delay(50)
+            }
+            assertEquals(
+                Player.REPEAT_MODE_OFF,
+                withContextMain { engine.player(PlaybackSlot.A).repeatMode },
+                "the loop outlived the transition",
+            )
+        } finally {
+            withContextMain { engine.release() }
+            scope.cancel()
+        }
+    }
+
+    /**
+     * `setAudioProcessors` replaces the sink's processor list, so whether Media3's own
+     * `SonicAudioProcessor` — the thing that makes a speed change a *time stretch* rather than a
+     * resample — survives a custom chain is a real question. It does, because
+     * `DefaultAudioProcessorChain` appends its own after whatever is passed in, and this is what
+     * pins that: at 1.5x the media position has to advance about half again as fast as the clock.
+     *
+     * A resample would advance the position at exactly the same rate while raising the pitch, so
+     * this distinguishes the two.
+     */
+    @Test
+    fun aTempoStretchChangesTheRate() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        val engine = withContextMain { CrossfadeEngine(context, scope) }
+        val tone = writeTone("stretch.wav", 440.0, 20.0)
+
+        try {
+            withContextMain {
+                engine.prepare(PlaybackSlot.A, tone.toURI().toString())
+                engine.player(PlaybackSlot.A).playbackParameters =
+                    androidx.media3.common.PlaybackParameters(1.5f)
+                engine.player(PlaybackSlot.A).playWhenReady = true
+            }
+            awaitState(engine.player(PlaybackSlot.A), Player.STATE_READY)
+
+            val from = withContextMain { engine.player(PlaybackSlot.A).currentPosition }
+            val wallClockMs = 3_000L
+            delay(wallClockMs)
+            val advanced = withContextMain { engine.player(PlaybackSlot.A).currentPosition } - from
+
+            // Generously bounded — the emulator's audio clock is not precise — but far enough
+            // from 1.0x to tell a stretch from no stretch at all.
+            assertTrue(
+                advanced > wallClockMs * 1.2,
+                "position advanced ${advanced}ms over ${wallClockMs}ms of wall clock at 1.5x"
+            )
+        } finally {
+            withContextMain { engine.release() }
+            scope.cancel()
+        }
+    }
+
     /** ExoPlayer is single-threaded and must be touched only from the thread that built it. */
     private suspend fun <T> withContextMain(block: () -> T): T =
         kotlinx.coroutines.withContext(Dispatchers.Main) { block() }

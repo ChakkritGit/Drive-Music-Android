@@ -16,9 +16,13 @@ import kotlin.math.roundToInt
  * session-wide `audiofx` effects cannot express it, because a transition's whole substance is
  * doing different things to two tracks at the same moment.
  *
- * Order matters and mirrors the iOS node graph: high-pass, then low-pass, then the bass shelf,
- * then gain. Filtering before gain means the ramp is applied to already-filtered audio, so a lane
- * that closes a filter to nothing does not also have to fight the volume lane.
+ * Order matters and mirrors the iOS node graph: high-pass, low-pass, bass shelf, reverb, then
+ * gain. Filtering before gain means the ramp is applied to already-filtered audio, so a lane that
+ * closes a filter to nothing does not also have to fight the volume lane. Reverb sits after the
+ * filters and before gain so the tail is built from what the listener is actually hearing — a
+ * track being filtered down washes out into a reverb of its filtered self, which is the point of
+ * the effect — and so the volume lane fades the wet tail along with everything else rather than
+ * leaving it hanging at full level after the track has gone.
  *
  * [parameters] is written from the playback thread and read on the audio thread every buffer. It
  * is a single immutable value for the same reason [Biquad.coefficients] is: reading a
@@ -43,6 +47,7 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
     private var highPass: Array<Biquad> = emptyArray()
     private var lowPass: Array<Biquad> = emptyArray()
     private var bass: Array<Biquad> = emptyArray()
+    private var reverb: Array<Reverb> = emptyArray()
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         // 16-bit PCM only. Media3 hands float buffers through when float output is enabled, and
@@ -56,6 +61,7 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         highPass = Array(channelCount) { Biquad() }
         lowPass = Array(channelCount) { Biquad() }
         bass = Array(channelCount) { Biquad() }
+        reverb = Array(channelCount) { Reverb(inputAudioFormat.sampleRate.toDouble()) }
         updateCoefficients(parameters)
         return inputAudioFormat
     }
@@ -87,7 +93,11 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         val frames = inputBuffer.remaining() / (2 * channelCount)
         val output = replaceOutputBuffer(frames * 2 * channelCount)
         val input = inputBuffer.order(ByteOrder.nativeOrder()).asShortBuffer()
-        val volume = parameters.volume
+        // Read once per buffer, not per sample: `parameters` is written from another thread, and
+        // a value that changed mid-buffer would apply half a ramp step to half the samples.
+        val current = parameters
+        val volume = current.volume
+        val wet = (current.reverbWet / 100).coerceIn(0.0, 1.0)
 
         for (frame in 0 until frames) {
             for (channel in 0 until channelCount) {
@@ -95,6 +105,13 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
                 sample = highPass[channel].process(sample)
                 sample = lowPass[channel].process(sample)
                 sample = bass[channel].process(sample)
+                if (wet > 0) {
+                    // Mixed against the dry signal rather than replacing it, and the dry side is
+                    // only partly pulled back: at full wet the track should sound like it is in a
+                    // large room, not like it has been replaced by its own echo.
+                    val tail = reverb[channel].process(sample.toFloat()).toDouble()
+                    sample = sample * (1 - wet * 0.5) + tail * wet
+                }
                 sample *= volume
                 // Clipped, not wrapped. A shelf boost or a resonant corner can push a sample past
                 // full scale, and letting a Short overflow turns a moment of loudness into a burst
@@ -115,6 +132,7 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         resetFilterState()
         channelCount = 0
         sampleRate = 0
+        reverb = emptyArray()
     }
 
     private fun resetFilterState() {
@@ -123,6 +141,8 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         highPass.forEach { it.reset() }
         lowPass.forEach { it.reset() }
         bass.forEach { it.reset() }
+        // A reverb tail that survives a seek is the previous position still audibly ringing.
+        reverb.forEach { it.clear() }
     }
 
     companion object {

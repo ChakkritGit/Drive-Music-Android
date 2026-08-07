@@ -3,11 +3,15 @@ package com.drivemusic.android.audio
 import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.Player
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.source.ClippingMediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.drivemusic.shared.transition.TransitionPlan
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -37,9 +41,10 @@ enum class PlaybackSlot {
  */
 @UnstableApi
 class CrossfadeEngine(
-    context: Context,
+    private val context: Context,
     private val scope: CoroutineScope,
 ) {
+    private val mediaSourceFactory = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(context))
     private val processors = mapOf(
         PlaybackSlot.A to TransitionAudioProcessor(),
         PlaybackSlot.B to TransitionAudioProcessor(),
@@ -97,13 +102,17 @@ class CrossfadeEngine(
      * times a second, and every lane interpolates linearly between keyframes, so a tick's worth of
      * quantisation is inaudible on volume and filter sweeps.
      *
-     * Still missing before this is a player, all of it deliberate for a spike:
-     * - the beatmatch stretch is applied as a plain [PlaybackParameters] speed change, which
-     *   moves pitch with it; Media3's Sonic can hold pitch, and should
-     * - reverb is not applied at all (see [SlotAutomation.reverbWet])
-     * - `plan.outgoingLoop` is ignored, so the Rise preset's held bar does not happen
-     * - nothing here is verified by ear, which for an audio path is the only verification that
-     *   ultimately counts
+     * The beatmatch stretch is a [PlaybackParameters] speed change, and that already holds pitch:
+     * `PlaybackParameters` carries speed and pitch as separate values, and Media3 routes speed
+     * through `SonicAudioProcessor`, which time-stretches. Worth stating because it is easy to
+     * assume otherwise — and because `setAudioProcessors` replaces the sink's processor list, so
+     * the question of whether Sonic survives a custom chain is a real one. It does:
+     * `DefaultAudioProcessorChain` appends its own Sonic after whatever is passed in. Pinned by
+     * `CrossfadeEngineInstrumentedTest.aTempoStretchChangesTheRate`.
+     *
+     * `plan.outgoingLoop` holds the outgoing track's last bar or two under the transition — how a
+     * DJ stretches a phrase to buy time. See [armOutgoingLoop] for why it is set up before the
+     * ramp rather than driven from it.
      */
     fun startTransition(plan: TransitionPlan, onComplete: (PlaybackSlot) -> Unit = {}) {
         if (isTransitioning) return
@@ -112,6 +121,8 @@ class CrossfadeEngine(
 
         isTransitioning = true
         rampJob?.cancel()
+
+        plan.outgoingLoop?.let { armOutgoingLoop(outgoing, it) }
 
         // Positioned and started before the ramp so the first tick lands on audio that is already
         // moving; starting it inside the loop would leave a tick of silence at t=0.
@@ -138,6 +149,8 @@ class CrossfadeEngine(
             player(outgoing).apply {
                 stop()
                 playbackParameters = PlaybackParameters(1f)
+                // Cleared or the slot would still be a looping clip the next time it is used.
+                repeatMode = Player.REPEAT_MODE_OFF
             }
             processors.getValue(outgoing).parameters = SlotParameters.silent
             // The incoming slot is now simply playing, so its chain has to be open — leaving it at
@@ -150,6 +163,32 @@ class CrossfadeEngine(
             isTransitioning = false
             onComplete(incoming)
         }
+    }
+
+    /**
+     * Replaces the outgoing slot's source with just the looped stretch, repeating.
+     *
+     * A [ClippingMediaSource] with `REPEAT_MODE_ONE` rather than watching the position and seeking
+     * back: the ramp ticks at [RAMP_INTERVAL_MS], so a seek-driven loop would overshoot its end by
+     * up to a tick and stutter on every pass. Clipping makes the loop a property of the source, so
+     * the seam is handled inside the player at frame accuracy.
+     *
+     * The cost is that this re-prepares the outgoing player mid-transition, which is a brief
+     * discontinuity in a track that is already being filtered and faded — acceptable there, and
+     * the reason a loop is only ever used by presets that ask for one.
+     */
+    private fun armOutgoingLoop(slot: PlaybackSlot, loop: ClosedFloatingPointRange<Double>) {
+        val player = player(slot)
+        val item = player.currentMediaItem ?: return
+        val clipped = ClippingMediaSource.Builder(mediaSourceFactory.createMediaSource(item))
+            .setStartPositionMs((loop.start * 1000).toLong())
+            .setEndPositionMs((loop.endInclusive * 1000).toLong())
+            .build()
+
+        player.setMediaSource(clipped)
+        player.repeatMode = Player.REPEAT_MODE_ONE
+        player.prepare()
+        player.playWhenReady = true
     }
 
     /**
@@ -170,6 +209,20 @@ class CrossfadeEngine(
         player(activeSlot.other).apply {
             stop()
             playbackParameters = PlaybackParameters(1f)
+        }
+        // The slot that survives may have been turned into a looping clip by `armOutgoingLoop`,
+        // and a cancelled transition has to leave it playing the whole track again.
+        player(activeSlot).apply {
+            if (repeatMode != Player.REPEAT_MODE_OFF) {
+                repeatMode = Player.REPEAT_MODE_OFF
+                currentMediaItem?.let { item ->
+                    val position = currentPosition
+                    setMediaItem(item)
+                    prepare()
+                    seekTo(position)
+                    playWhenReady = true
+                }
+            }
         }
     }
 

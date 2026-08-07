@@ -11,8 +11,8 @@ Scaffold plus the first slice of shared logic. Builds and passes on every target
 | --- | --- |
 | `:shared:testDebugUnitTest` | 59 tests, 0 failures |
 | `:shared:iosSimulatorArm64Test` | 59 tests, 0 failures |
-| `:androidApp:testDebugUnitTest` | 23 tests, 0 failures |
-| `:androidApp:connectedDebugAndroidTest` | 3 tests, 0 failures (emulator, API 36) |
+| `:androidApp:testDebugUnitTest` | 29 tests, 0 failures |
+| `:androidApp:connectedDebugAndroidTest` | 5 tests, 0 failures (emulator, API 36) |
 | `:shared:linkReleaseFrameworkIosArm64` | `DriveMusicShared.framework` produced |
 | `:androidApp:assembleDebug` | APK produced |
 
@@ -145,20 +145,30 @@ Verified at three levels, none of which involve trusting the code by reading it:
 
 `SlotAutomationTest` pins the seam between the shared curves and the engine.
 
-**Not yet done, and none of it hidden:**
+**It has been listened to and it sounds right.** That was the question the whole spike existed to
+answer, and it is answered — the rest of the port rests on a foundation that has been heard, not
+just measured. `TransitionDemoScreen` is still the app's home screen: pick two files with the
+system picker, choose a preset and a length, and hear it. It needs no auth, no networking and no
+library.
 
-- **It has not been listened to.** For an audio path that is the only verification that finally
-  counts — everything above establishes that the chain does what the curves ask, and nothing at
-  all about whether what the curves ask sounds good. `TransitionDemoScreen` (the app's current
-  home screen) exists for exactly this: pick two files with the system picker, choose a preset and
-  a length, and hear it. It needs no auth, no networking and no library, so it can be used now.
-- Reverb is not applied. Media3 has no reverb processor, and `PresetReverb` attaches to a session
-  so it would wash both slots. `SlotAutomation.reverbWet` returns the lane value so the gap stays
-  visible; Rise leans on it heavily, Mix lightly and late.
-- The beatmatch stretch uses plain `PlaybackParameters`, which moves pitch with speed. Media3's
-  Sonic can hold pitch and should be used instead.
-- `TransitionPlan.outgoingLoop` is ignored, so Rise's held bar does not happen.
-- Sample format is 16-bit PCM only; float output is declined and Media3 converts.
+Every lane of a `TransitionShape` is now applied:
+
+- **Reverb** is hand-written (`Reverb.kt`, four combs into two allpasses). Media3 has no reverb
+  processor, and `android.media.audiofx.PresetReverb` attaches to an audio *session*, so it would
+  wash both slots and defeat the point. Tested for the thing a feedback network gets wrong: the
+  tail decays, stays bounded under sustained full-scale input, and is the same length at any
+  sample rate.
+- **Beatmatch was never the gap it was written up as.** `PlaybackParameters` carries speed and
+  pitch separately and Media3 routes speed through `SonicAudioProcessor`, which time-stretches.
+  The real question was whether Sonic survives a custom processor list — `setAudioProcessors`
+  replaces it — and it does, because `DefaultAudioProcessorChain` appends its own afterwards.
+  Pinned by an instrumented test that measures the rate.
+- **The outgoing loop** uses a `ClippingMediaSource` with `REPEAT_MODE_ONE` rather than watching
+  the position and seeking back: the ramp ticks at 33ms, so a seek-driven loop would overshoot its
+  end by up to a tick and stutter on every pass.
+
+Remaining limitation: sample format is 16-bit PCM only; float output is declined and Media3
+converts.
 
 ## Not started
 

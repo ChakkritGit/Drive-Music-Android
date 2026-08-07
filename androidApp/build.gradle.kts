@@ -43,6 +43,7 @@ android {
 
 dependencies {
     implementation(project(":shared"))
+    implementation(libs.androidx.media3.common.ktx)
 
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.common)

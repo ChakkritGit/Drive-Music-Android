@@ -19,6 +19,8 @@ data class SlotParameters(
     val highPassHz: Double,
     /** Bass shelf in dB, 0 for flat. */
     val bassDb: Double,
+    /** Reverb wet mix, 0..100. 0 bypasses the reverb entirely. */
+    val reverbWet: Double = 0.0,
 ) {
     companion object {
         /** Full level, every filter open — what a slot sits at outside a transition. */
@@ -27,6 +29,7 @@ data class SlotParameters(
             lowPassHz = TransitionFilterRange.OPEN_HIGH_FREQUENCY.toDouble(),
             highPassHz = TransitionFilterRange.OPEN_LOW_FREQUENCY.toDouble(),
             bassDb = 0.0,
+            reverbWet = 0.0,
         )
 
         val silent = open.copy(volume = 0.0)
@@ -41,8 +44,7 @@ data class SlotParameters(
  * resemble it: the curves come from `:shared`, so "what a Mix sounds like" is defined once. Only
  * the application of the numbers differs.
  *
- * Reverb is read but not applied — see [SlotAutomation.reverbWet]. Everything else in the shape is
- * honored.
+ * Every lane of the shape is honored.
  */
 object SlotAutomation {
     /**
@@ -58,6 +60,7 @@ object SlotAutomation {
                 .lowPassFrequency(shape.outgoingLowPass.valueAt(clamped)).toDouble(),
             highPassHz = TransitionFilterRange.OPEN_LOW_FREQUENCY.toDouble(),
             bassDb = shape.outgoingBass.valueAt(clamped),
+            reverbWet = shape.outgoingReverb.valueAt(clamped),
         )
     }
 
@@ -69,17 +72,18 @@ object SlotAutomation {
             highPassHz = TransitionFilterRange
                 .highPassFrequency(shape.incomingHighPass.valueAt(clamped)).toDouble(),
             bassDb = shape.incomingBass.valueAt(clamped),
+            // The shape has no incoming reverb lane — a track arriving drenched would sound like
+            // a mistake rather than an effect, and no preset asks for it.
+            reverbWet = 0.0,
         )
     }
 
     /**
-     * The outgoing reverb lane, 0..100.
+     * The outgoing reverb lane, 0..100. Applied by [TransitionAudioProcessor] via [Reverb].
      *
-     * Exposed but not yet wired to anything. Media3 has no reverb processor, so this needs either
-     * `android.media.audiofx.PresetReverb` — which attaches to an audio session, so it would wash
-     * *both* slots and defeat the point — or a hand-written one in the processor chain. Only the
-     * Rise preset leans on it heavily; Mix uses it lightly and late. Returning the value rather
-     * than silently dropping it keeps the gap visible.
+     * Media3 has no reverb processor and `android.media.audiofx.PresetReverb` attaches to an audio
+     * session — it would wash *both* slots and defeat the point — so the reverb is hand-written
+     * and lives inside the slot's own chain like every other lane.
      */
     fun reverbWet(shape: TransitionShape, t: Double): Double =
         shape.outgoingReverb.valueAt(t.coerceIn(0.0, 1.0))
