@@ -588,18 +588,14 @@ private fun TransportControls(
             )
             if (fade > 0.01f) {
                 MixGlow(
+                    scale = scale,
+                    alpha = fade,
                     // Matched to the button's own box, and drawing beyond it. The glow must not
                     // contribute any size of its own: given its own, it widened the transport row
                     // and pushed shuffle and repeat to the screen edges, and made the row taller
                     // so every control dropped the moment playback started. iOS puts this in a
                     // `.background`, which is layout-neutral for the same reason.
-                    modifier = Modifier
-                        .matchParentSize()
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = fade
-                        },
+                    modifier = Modifier.matchParentSize(),
                 )
             }
         }

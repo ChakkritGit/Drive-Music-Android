@@ -36,7 +36,7 @@ import kotlin.math.sin
  * motion stuttering.
  */
 @Composable
-fun MixGlow(modifier: Modifier = Modifier) {
+fun MixGlow(scale: Float, alpha: Float, modifier: Modifier = Modifier) {
     val frame by produceState(0L) {
         while (true) {
             withInfiniteAnimationFrameMillis { value = it }
@@ -48,21 +48,26 @@ fun MixGlow(modifier: Modifier = Modifier) {
     // Sizing it to the glow instead made the Box around the play button 128dp tall, so the whole
     // transport row grew the moment playback started and every control shifted down with it.
     // Nothing clips here, so drawing past the edge costs nothing but is invisible to layout.
+    //
+    // [scale] and [alpha] are applied to what is drawn rather than through a `graphicsLayer`. A
+    // layer is rasterised at the node's own size, and everything here is deliberately drawn well
+    // outside it — so animating one cut the strands off square at the button's edge and the retract
+    // read as the light shattering rather than sliding away.
     Canvas(modifier = modifier) {
         val time = frame / 1000.0
 
         // The soft light the strands throw. Drawn as radial gradients rather than blurred solid
         // circles: a blur is an offscreen pass per frame for a falloff a gradient describes
         // directly.
-        haze(accent, 0.5f, 78.dp.toPx() / 2)
-        haze(accent, 0.3f, 92.dp.toPx() / 2)
-        haze(accent, 0.18f, 112.dp.toPx() / 2)
+        haze(accent, 0.5f * alpha, 78.dp.toPx() / 2 * scale)
+        haze(accent, 0.3f * alpha, 92.dp.toPx() / 2 * scale)
+        haze(accent, 0.18f * alpha, 112.dp.toPx() / 2 * scale)
 
         // Two strands, each with its own wave speeds and directions. Nothing is shared between
         // them but the circle they travel on, so they drift together and apart on their own
         // schedules instead of holding a fixed braid that merely spins.
-        strand(accent, time, primarySpeed = 1 / 7.0, secondarySpeed = -1 / 11.0, offset = 0.0)
-        strand(accent, time, primarySpeed = -1 / 9.0, secondarySpeed = 1 / 13.0, offset = PI)
+        strand(accent, time, 1 / 7.0, -1 / 11.0, 0.0, scale, alpha)
+        strand(accent, time, -1 / 9.0, 1 / 13.0, PI, scale, alpha)
     }
 }
 
@@ -94,15 +99,17 @@ private fun DrawScope.strand(
     primarySpeed: Double,
     secondarySpeed: Double,
     offset: Double,
+    scale: Float,
+    alpha: Float,
 ) {
     val path = helixPath(
         primaryPhase = time * primarySpeed * 2 * PI + offset,
         secondaryPhase = time * secondarySpeed * 2 * PI + offset,
-        radius = STRAND_RADIUS.dp.toPx(),
+        radius = STRAND_RADIUS.dp.toPx() * scale,
     )
-    drawPath(path, color.copy(alpha = 0.22f), style = Stroke(width = 7.dp.toPx()))
-    drawPath(path, color.copy(alpha = 0.5f), style = Stroke(width = 2.5.dp.toPx()))
-    drawPath(path, color.copy(alpha = 0.95f), style = Stroke(width = 1.dp.toPx()))
+    drawPath(path, color.copy(alpha = 0.22f * alpha), style = Stroke(width = 7.dp.toPx()))
+    drawPath(path, color.copy(alpha = 0.5f * alpha), style = Stroke(width = 2.5.dp.toPx()))
+    drawPath(path, color.copy(alpha = 0.95f * alpha), style = Stroke(width = 1.dp.toPx()))
 }
 
 /**
