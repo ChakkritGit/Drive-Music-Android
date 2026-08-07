@@ -10,6 +10,7 @@
     <string name="sign_in_prompt">Google ドライブ内の音楽を再生するにはサインインしてください。</string>
     <string name="back">戻る</string>
     <string name="close">閉じる</string>
+    <string name="clear">消去</string>
     <string name="more">その他</string>
     <string name="pause">一時停止</string>
     <string name="previous">前へ</string>

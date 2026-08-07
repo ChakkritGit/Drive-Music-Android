@@ -195,17 +195,7 @@ private fun AppShellContent(
                         SearchField(
                             value = query,
                             placeholder = stringResource(R.string.search_your_music),
-                            modifier = Modifier.padding(end = 4.dp).focusRequester(searchFocus),
-                            trailing = {
-                                if (query.isNotEmpty()) {
-                                    IconButton(onClick = { query = "" }) {
-                                        Icon(
-                                            painterResource(AppIcons.Close),
-                                            contentDescription = stringResource(R.string.close),
-                                        )
-                                    }
-                                }
-                            },
+                            modifier = Modifier.focusRequester(searchFocus),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                             onChange = { query = it },
@@ -230,6 +220,19 @@ private fun AppShellContent(
                     }
                 },
                 actions = {
+                    // Clearing sits beside the field rather than inside it. Inside, it is a third
+                    // icon crowding a pill that already carries a magnifier and the text itself,
+                    // and it eats the field's own width; beside it, it lands where the bar's other
+                    // buttons live and is the same size as them. It appears only once there is
+                    // something to clear — a permanent one would be a button that does nothing.
+                    if (pushed == Pushed.Search && query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(
+                                painterResource(AppIcons.Close),
+                                contentDescription = stringResource(R.string.clear),
+                            )
+                        }
+                    }
                     // The header buttons stay on the top-level screens only — inside a pushed one
                     // the bar belongs to that screen.
                     if (pushed == null) {

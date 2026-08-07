@@ -10,6 +10,7 @@
     <string name="sign_in_prompt">ลงชื่อเข้าใช้เพื่อเล่นเพลงใน Google Drive ของคุณ</string>
     <string name="back">ย้อนกลับ</string>
     <string name="close">ปิด</string>
+    <string name="clear">ล้างข้อความ</string>
     <string name="more">เพิ่มเติม</string>
     <string name="pause">หยุดชั่วคราว</string>
     <string name="previous">ก่อนหน้า</string>

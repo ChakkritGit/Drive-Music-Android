@@ -33,7 +33,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.media3.common.util.UnstableApi
-import com.drivemusic.android.R
 import com.drivemusic.android.auth.GoogleAuth
 import com.drivemusic.android.player.PlayerViewModel
 import androidx.compose.ui.platform.LocalContext
