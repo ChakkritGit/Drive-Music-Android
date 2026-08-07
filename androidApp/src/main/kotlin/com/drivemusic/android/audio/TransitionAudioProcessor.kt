@@ -39,6 +39,22 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
             updateCoefficients(value)
         }
 
+    /**
+     * How loud the last buffer was, 0..1, smoothed — read by the Now Playing glow so it can move
+     * with the music.
+     *
+     * Computed here rather than from a separate `Visualizer`: this processor already sees every
+     * sample on its way to the sink, so the reading costs one multiply-accumulate per frame and
+     * needs no extra permission (`Visualizer` requires RECORD_AUDIO, which is a microphone
+     * prompt for a decoration).
+     *
+     * `@Volatile` because the audio thread writes it and the UI thread reads it, and neither
+     * should ever wait on the other for it — a glow one frame stale is not a defect.
+     */
+    @Volatile
+    var level: Float = 0f
+        private set
+
     private var channelCount = 0
     private var sampleRate = 0
 
@@ -119,6 +135,7 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         val volume = current.volume
         val wet = (current.reverbWet / 100).coerceIn(0.0, 1.0)
         val toneEnabled = !current.eq.isFlat
+        var peak = 0.0
 
         for (frame in 0 until frames) {
             for (channel in 0 until channelCount) {
@@ -143,15 +160,29 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
                 // full scale, and letting a Short overflow turns a moment of loudness into a burst
                 // of noise at the opposite polarity.
                 val scaled = (sample * SHORT_SCALE).roundToInt().coerceIn(MIN_SHORT, MAX_SHORT)
+                val magnitude = if (scaled < 0) -scaled.toDouble() else scaled.toDouble()
+                if (magnitude > peak) peak = magnitude
                 output.putShort(scaled.toShort())
             }
         }
+        // Peak of the buffer, then smoothed towards it. RMS is the more correct measure of
+        // loudness but it barely moves on dense modern masters, so the glow would sit at a
+        // constant size; peak follows the transients, which is what "reacts to the music" means
+        // to someone watching it. Attack is fast and release slow, or every gap between beats
+        // reads as the glow collapsing.
+        val target = (peak / SHORT_SCALE).toFloat().coerceIn(0f, 1f)
+        val smoothing = if (target > level) LEVEL_ATTACK else LEVEL_RELEASE
+        level += (target - level) * smoothing
+
         inputBuffer.position(inputBuffer.limit())
         output.flip()
     }
 
     override fun onFlush() {
         resetFilterState()
+        // A level left over from before a seek would hold the glow at the old position's loudness
+        // until the next buffer arrives.
+        level = 0f
     }
 
     override fun onReset() {
@@ -182,5 +213,9 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         private const val SHORT_SCALE = 32768.0
         private const val MIN_SHORT = -32768
         private const val MAX_SHORT = 32767
+
+        /** Fast up, slow down — see `level`. */
+        private const val LEVEL_ATTACK = 0.5f
+        private const val LEVEL_RELEASE = 0.08f
     }
 }

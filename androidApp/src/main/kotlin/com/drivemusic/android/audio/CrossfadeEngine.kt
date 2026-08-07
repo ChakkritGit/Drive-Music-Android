@@ -76,6 +76,15 @@ class CrossfadeEngine(
     fun player(slot: PlaybackSlot): ExoPlayer = players.getValue(slot)
 
     /**
+     * The loudest slot's current level, 0..1 — what Now Playing's glow moves with.
+     *
+     * The louder of the two rather than the active one's: during a crossfade both are audible, and
+     * following only one would make the glow dip to nothing halfway through the transition that is
+     * the most interesting thing the player ever does.
+     */
+    fun currentLevel(): Float = processors.values.maxOf { it.level }
+
+    /**
      * A player whose audio sink carries [processor].
      *
      * Each player gets its own sink and its own processor instance — that separation is the whole

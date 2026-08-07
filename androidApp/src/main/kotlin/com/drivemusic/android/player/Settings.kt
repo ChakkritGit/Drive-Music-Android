@@ -27,6 +27,14 @@ class SettingsStore(context: Context) {
         get() = preferences.getBoolean(AUTO_MIX, true)
         set(value) = preferences.edit().putBoolean(AUTO_MIX, value).apply()
 
+    /**
+     * The ambient glow behind Now Playing's cover. Key matches the iOS default's, so the two are
+     * greppably the same setting even though nothing syncs between them.
+     */
+    var ambientGlowEnabled: Boolean
+        get() = preferences.getBoolean(AMBIENT_GLOW, true)
+        set(value) = preferences.edit().putBoolean(AMBIENT_GLOW, value).apply()
+
     var gaplessEnabled: Boolean
         get() = preferences.getBoolean(GAPLESS, true)
         set(value) = preferences.edit().putBoolean(GAPLESS, value).apply()
@@ -54,6 +62,7 @@ class SettingsStore(context: Context) {
         const val CROSSFADE_SECONDS = "drive-music-crossfade-seconds"
         const val AUTO_MIX = "drive-music-auto-mix-enabled"
         const val GAPLESS = "drive-music-gapless-enabled"
+        const val AMBIENT_GLOW = "drive-music-ambient-glow-enabled"
         const val NORMALIZE = "drive-music-volume-normalization-enabled"
         const val EQ_ENABLED = "drive-music-eq-enabled"
         const val EQ_BASS = "drive-music-eq-bass"

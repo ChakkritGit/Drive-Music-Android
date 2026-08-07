@@ -12,6 +12,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -67,44 +68,68 @@ fun MarqueeText(
     val overflow = max(0, textWidth - containerWidth)
     val scrolls = isActive && overflow > 1 && containerWidth > 0
 
-    Box(modifier = modifier.fillMaxWidth().onSizeChanged { containerWidth = it.width }) {
+    val pixelsPerSecond = with(density) { SCROLL_DP_PER_SECOND.dp.toPx() }
+    val fadeWidth = with(density) { FADE_WIDTH.dp.toPx() }
+    val scrollSeconds = max(2f, overflow / pixelsPerSecond)
+    val cycleMillis = ((2 * PAUSE_SECONDS + 2 * scrollSeconds) * 1000).toLong()
+
+    val progress by produceState(0f, cycleMillis, scrolls) {
         if (!scrolls) {
-            Text(text, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            return@Box
+            value = 0f
+            return@produceState
         }
-
-        val pixelsPerSecond = with(density) { SCROLL_DP_PER_SECOND.dp.toPx() }
-        val fadeWidth = with(density) { FADE_WIDTH.dp.toPx() }
-        val scrollSeconds = max(2f, overflow / pixelsPerSecond)
-        val cycleMillis = ((2 * PAUSE_SECONDS + 2 * scrollSeconds) * 1000).toLong()
-
-        val progress by produceState(0f, cycleMillis) {
-            while (true) {
-                withInfiniteAnimationFrameMillis { frameMillis ->
-                    value = progressAt(frameMillis.mod(cycleMillis), scrollSeconds)
-                }
+        while (true) {
+            withInfiniteAnimationFrameMillis { frameMillis ->
+                value = progressAt(frameMillis.mod(cycleMillis), scrollSeconds)
             }
         }
+    }
 
-        Text(
-            text,
-            style = style,
-            color = color,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier
-                .graphicsLayer {
-                    translationX = -overflow * progress
-                    // The fade below multiplies the text's own alpha, which needs a layer of its
-                    // own to multiply into — without one it would cut a hole through everything
-                    // drawn underneath as well.
-                    compositingStrategy = CompositingStrategy.Offscreen
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            // Clipped: the text is laid out at its full intrinsic width and then translated, so
+            // without this it draws straight past the container's edges — over the favourite
+            // button on one side and off the screen on the other.
+            .clipToBounds()
+            .then(
+                // The fade belongs to the *window*, not to the text moving through it. Drawn on
+                // the text it was sized to the full string and slid along with it, so the soft
+                // edges travelled with the words instead of staying at the container's edges,
+                // which is the visible thing that was wrong.
+                if (scrolls) {
+                    Modifier
+                        .graphicsLayer {
+                            // The gradient below multiplies alpha, which needs a layer of its own
+                            // to multiply into — without one it would cut a hole through
+                            // everything drawn underneath as well.
+                            compositingStrategy = CompositingStrategy.Offscreen
+                        }
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(
+                                edgeFade(progress, size.width, fadeWidth),
+                                blendMode = BlendMode.DstIn,
+                            )
+                        }
+                } else {
+                    Modifier
                 }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(edgeFade(progress, size.width, fadeWidth), blendMode = BlendMode.DstIn)
-                },
-        )
+            )
+            .onSizeChanged { containerWidth = it.width },
+    ) {
+        if (scrolls) {
+            Text(
+                text,
+                style = style,
+                color = color,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.graphicsLayer { translationX = -overflow * progress },
+            )
+        } else {
+            Text(text, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
