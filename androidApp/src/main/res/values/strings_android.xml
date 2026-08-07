@@ -56,4 +56,8 @@
     <string name="head_to_browse">Head to Browse to play something from your Drive.</string>
     <string name="no_playlists_detail">Create one above, or add a track to a new playlist from Browse.</string>
     <string name="name_field">Name</string>
+    <string name="save">Save</string>
+    <string name="create_playlist">Create playlist</string>
+    <string name="no_playlists_yet_create_one">No playlists yet. Create one, or add a track to a new playlist from its menu.</string>
+    <string name="delete_playlist_confirm">Delete “%1$s”? The playlist is removed. The tracks themselves stay downloaded.</string>
 </resources>

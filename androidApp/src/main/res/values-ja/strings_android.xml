@@ -56,4 +56,8 @@
     <string name="head_to_browse">「参照」から Google ドライブの曲を再生してください。</string>
     <string name="no_playlists_detail">上で作成するか、「参照」から曲を新しいプレイリストに追加してください。</string>
     <string name="name_field">名前</string>
+    <string name="save">保存</string>
+    <string name="create_playlist">プレイリストを作成</string>
+    <string name="no_playlists_yet_create_one">プレイリストはまだありません。新規作成するか、曲のメニューから新しいプレイリストに追加してください。</string>
+    <string name="delete_playlist_confirm">「%1$s」を削除しますか？プレイリストは削除されますが、曲のダウンロードは残ります。</string>
 </resources>

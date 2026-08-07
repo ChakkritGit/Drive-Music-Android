@@ -1,7 +1,7 @@
 package com.drivemusic.android.ui
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.clickable
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,7 +47,8 @@ fun PlaylistsScreen(
     onQueryChange: (String) -> Unit,
     onOpen: (Collection) -> Unit,
 ) {
-    var newName by remember { mutableStateOf("") }
+    var creating by remember { mutableStateOf(false) }
+    var confirmingDelete by remember { mutableStateOf<Playlist?>(null) }
 
     val visible = remember(state.playlists, query) {
         val normalized = query.trim().lowercase()
@@ -55,38 +56,76 @@ fun PlaylistsScreen(
         else state.playlists.filter { it.name.lowercase().contains(normalized) }
     }
 
+    // Deleting a playlist cannot be undone and the row it belongs to is one people tap all day, so
+    // it asks. The name is in the question: "are you sure" tells the reader nothing they can check.
+    confirmingDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { confirmingDelete = null },
+            title = { Text(stringResource(R.string.delete_playlist)) },
+            text = { Text(stringResource(R.string.delete_playlist_confirm, target.name)) },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.deletePlaylist(target.id); confirmingDelete = null },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+                ) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingDelete = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
+    if (creating) {
+        NameDialog(
+            title = stringResource(R.string.create_playlist),
+            confirmLabel = stringResource(R.string.save),
+            onDismiss = { creating = false },
+        ) { name ->
+            viewModel.createPlaylist(name)
+            creating = false
+        }
+    }
+
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         // Search and the create row are part of the scroll, so they move out of the way rather
         // than holding a fixed slice of the screen.
         item { SearchField(query, stringResource(R.string.search_playlists), onChange = onQueryChange) }
         item {
-        // Inline creation rather than a dialog behind a "+" — matches iOS, and making a playlist
-        // is the thing this screen is for.
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = newName,
-                onValueChange = { newName = it },
-                placeholder = { Text(stringResource(R.string.new_playlist_name)) },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(
-                onClick = { viewModel.createPlaylist(newName.trim()); newName = "" },
-                enabled = newName.isNotBlank(),
+            // A button, not a permanently open text field. Creating a playlist happens once in a
+            // while; the field sat there empty the rest of the time, taking a row of a list whose
+            // job is to show playlists, and it put a second text field directly under the search
+            // one — two adjacent boxes that look alike and do entirely different things.
+            // Sized to its label and pushed to the trailing edge: a full-width bar reads as the
+            // primary thing on the screen, and the primary thing here is the list of playlists.
+            // Filled rather than outlined because it is still the only action the screen offers.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.End,
             ) {
-                Icon(painterResource(AppIcons.Add), contentDescription = null)
-                Text(stringResource(R.string.create))
+                Button(
+                    onClick = { creating = true },
+                    // Tighter than the stock 24dp: that padding is sized for a button standing
+                    // alone, and this one carries an icon as well as its label.
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Icon(painterResource(AppIcons.Add), contentDescription = null)
+                    Text(
+                        stringResource(R.string.create_playlist),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
             }
-        }
         }
 
         if (state.playlists.isEmpty()) {
             item {
                 Text(
-                    stringResource(R.string.no_playlists_yet_create_one_above_or_add_a_track_to_a_new_pl),
+                    stringResource(R.string.no_playlists_yet_create_one),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.padding(16.dp),
@@ -104,21 +143,22 @@ fun PlaylistsScreen(
         } else {
                 items(visible, key = { it.id }) { playlist ->
                     val subtitle = trackCount(playlist.tracks.size)
-                    PlaylistRow(
-                        viewModel = viewModel,
-                        playlist = playlist,
-                        onOpen = {
-                            onOpen(
-                                Collection(
-                                    playlist.name,
-                                    subtitle,
-                                    playlist.tracks,
-                                    PlaySource(playlist.id, playlist.name, PlaySource.Kind.PLAYLIST),
+                    SwipeToDeleteRow(onDeleteRequested = { confirmingDelete = playlist }) {
+                        PlaylistRow(
+                            viewModel = viewModel,
+                            playlist = playlist,
+                            onOpen = {
+                                onOpen(
+                                    Collection(
+                                        playlist.name,
+                                        subtitle,
+                                        playlist.tracks,
+                                        PlaySource(playlist.id, playlist.name, PlaySource.Kind.PLAYLIST),
+                                    )
                                 )
-                            )
-                        },
-                        onDelete = { viewModel.deletePlaylist(playlist.id) },
-                    )
+                            },
+                        )
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                 }
         }
@@ -131,7 +171,6 @@ private fun PlaylistRow(
     viewModel: PlayerViewModel,
     playlist: Playlist,
     onOpen: () -> Unit,
-    onDelete: () -> Unit,
 ) {
     val covers by androidx.compose.runtime.produceState(
         initialValue = emptyList<ByteArray>(),
@@ -153,15 +192,27 @@ private fun PlaylistRow(
                 color = MaterialTheme.colorScheme.outline,
             )
         }
-        IconButton(onClick = onDelete) {
-            Icon(painterResource(AppIcons.Delete), contentDescription = stringResource(R.string.delete_playlist))
-        }
     }
 }
 
+/**
+ * Asks for one name.
+ *
+ * The field takes focus as the dialog opens: a dialog whose entire content is a single text field
+ * has nothing else the opening tap could have meant, and making the reader tap again to start
+ * typing is a step that never had a purpose.
+ */
 @Composable
-fun NameDialog(title: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+fun NameDialog(
+    title: String,
+    confirmLabel: String = stringResource(R.string.create),
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
     var name by remember { mutableStateOf("") }
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.compose.runtime.LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -171,11 +222,20 @@ fun NameDialog(title: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit
                 onValueChange = { name = it },
                 singleLine = true,
                 label = { Text(stringResource(R.string.name_field)) },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                ),
+                // Enter confirms, so the keyboard's own action key does what the dialog's button
+                // does rather than being a dead end.
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onDone = { if (name.isNotBlank()) onConfirm(name.trim()) },
+                ),
+                modifier = Modifier.focusRequester(focusRequester),
             )
         },
         confirmButton = {
             Button(onClick = { onConfirm(name.trim()) }, enabled = name.isNotBlank()) {
-                Text(stringResource(R.string.create))
+                Text(confirmLabel)
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
@@ -192,9 +252,13 @@ fun AddToPlaylistDialog(
     onCreate: (String) -> Unit,
 ) {
     var creating by remember { mutableStateOf(false) }
+    var confirmingDelete by remember { mutableStateOf<Playlist?>(null) }
 
     if (creating) {
-        NameDialog(stringResource(R.string.new_playlist), { creating = false }) { onCreate(it); creating = false; onDismiss() }
+        NameDialog(
+            title = stringResource(R.string.new_playlist),
+            onDismiss = { creating = false },
+        ) { onCreate(it); creating = false; onDismiss() }
         return
     }
 

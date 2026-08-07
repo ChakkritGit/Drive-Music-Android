@@ -56,4 +56,8 @@
     <string name="head_to_browse">ไปที่แท็บเรียกดูเพื่อเล่นเพลงจาก Drive ของคุณ</string>
     <string name="no_playlists_detail">สร้างด้านบน หรือเพิ่มเพลงลงเพลย์ลิสต์ใหม่จากแท็บเรียกดู</string>
     <string name="name_field">ชื่อ</string>
+    <string name="save">บันทึก</string>
+    <string name="create_playlist">สร้างเพลย์ลิสต์</string>
+    <string name="no_playlists_yet_create_one">ยังไม่มีเพลย์ลิสต์ สร้างใหม่ หรือเพิ่มเพลงลงเพลย์ลิสต์ใหม่จากเมนูของเพลง</string>
+    <string name="delete_playlist_confirm">ลบ “%1$s” ไหม เพลย์ลิสต์จะถูกลบ แต่เพลงที่ดาวน์โหลดไว้ยังอยู่</string>
 </resources>
