@@ -8,6 +8,7 @@ import com.drivemusic.shared.model.PlaybackSession
 import com.drivemusic.shared.model.PlaySource
 import com.drivemusic.shared.model.Playlist
 import com.drivemusic.shared.model.RecentSource
+import com.drivemusic.shared.model.TrackAnalysis
 import com.drivemusic.shared.recommendation.ListeningModel
 import com.drivemusic.shared.recommendation.RecommendationModel
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +70,30 @@ class RoomTrackLibrary(
 
     suspend fun putArtwork(fileId: String, bytes: ByteArray) = io {
         dao.putArtwork(ArtworkEntity(fileId, bytes))
+    }
+
+    override suspend fun listAnalyses(): Map<String, TrackAnalysis> = io {
+        dao.allAnalyses().mapNotNull { row ->
+            // A row that will not parse is a row written by a build that stored something else.
+            // Dropping it means it is recomputed; failing the whole read would leave the player
+            // with no analysis at all because of one bad entry.
+            runCatching { row.fileId to json.decodeFromString(TrackAnalysis.serializer(), row.json) }
+                .getOrNull()
+        }.toMap()
+    }
+
+    override suspend fun putAnalysis(analysis: TrackAnalysis) = io {
+        dao.putAnalysis(
+            TrackAnalysisEntity(
+                fileId = analysis.fileId,
+                json = json.encodeToString(TrackAnalysis.serializer(), analysis),
+                version = analysis.version,
+            )
+        )
+    }
+
+    override suspend fun deleteStaleAnalyses(version: Int) = io {
+        dao.deleteStaleAnalyses(version)
     }
 
     override suspend fun listPlaylists(): List<Playlist> = io {

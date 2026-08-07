@@ -26,7 +26,7 @@ class AppContainer(context: Context) {
         applicationContext,
         LibraryDatabase::class.java,
         "drive-music.db",
-    ).build()
+    ).addMigrations(LibraryDatabase.MIGRATION_1_2).build()
 
     val library = RoomTrackLibrary(database.dao())
     val files = FileAudioStore(applicationContext)

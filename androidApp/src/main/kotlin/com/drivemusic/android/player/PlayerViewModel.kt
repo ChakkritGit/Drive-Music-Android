@@ -24,6 +24,9 @@ import com.drivemusic.shared.playback.PlaybackQueue
 import com.drivemusic.shared.playback.PlaybackQueueState
 import com.drivemusic.shared.recommendation.Features
 import com.drivemusic.shared.recommendation.RecommendationModel
+import com.drivemusic.android.audio.TrackAnalysisRunner
+import com.drivemusic.shared.analysis.TrackAnalyzer
+import com.drivemusic.shared.model.TrackAnalysis
 import com.drivemusic.shared.transition.TransitionPlan
 import com.drivemusic.shared.transition.TransitionSettings
 import kotlinx.coroutines.Job
@@ -67,6 +70,8 @@ class PlayerViewModel(
         val autoMixEnabled: Boolean = true,
         val gaplessEnabled: Boolean = true,
         val ambientGlowEnabled: Boolean = true,
+        /** Tempo, key and mix points per file id, for the tracks that have been analysed. */
+        val analyses: Map<String, TrackAnalysis> = emptyMap(),
         val volumeNormalizationEnabled: Boolean = true,
         val crossfadeSeconds: Double = 8.0,
         val eq: EqSettings = EqSettings.flat,
@@ -121,6 +126,13 @@ class PlayerViewModel(
     private val settings = SettingsStore(application)
     private var model = RecommendationModel.createDefault()
     private var tickJob: Job? = null
+    private var analysisJob: Job? = null
+
+    /**
+     * Tracks waiting to be analysed. A plain queue rather than a set of parallel jobs — see
+     * [analyzeInBackground].
+     */
+    private val pendingAnalysis = ArrayDeque<CachedTrack>()
     private var loadJob: Job? = null
 
     /** True while a transition has been started for the current track, so it fires only once. */
@@ -164,8 +176,13 @@ class PlayerViewModel(
         viewModelScope.launch {
             model = library.loadModel()
             _state.update { it.copy(trainingEvents = model.trainingEvents) }
+            // Anything the previous analyser produced is dropped rather than trusted: the version
+            // exists precisely because a stored BPM from an older detector is worse than none —
+            // it looks authoritative and shapes every mix out of that track.
+            library.deleteStaleAnalyses(TrackAnalyzer.VERSION)
             refreshLibrary()
             restoreSession()
+            analyzeBacklog()
         }
     }
 
@@ -331,7 +348,55 @@ class PlayerViewModel(
                     playlists = library.listPlaylists(),
                     recentSources = library.listRecentSources(),
                     cacheBytes = files.totalBytes(),
+                    analyses = library.listAnalyses(),
                 )
+            }
+        }
+    }
+
+    /**
+     * Analyses [file] if it has not been analysed by the current analyser, and stores the result.
+     *
+     * Fire and forget, one track at a time. Analysis is an enhancement — without it the player
+     * falls back to a plain crossfade — so it must never be on the path between tapping a track
+     * and hearing it. [analysisJob] holding a single job is the throttle: downloading a folder
+     * queues dozens of these, and running them together would put every core on decoding audio
+     * while the user is trying to listen to it.
+     */
+    /**
+     * Queues every downloaded track that has no current analysis.
+     *
+     * Run once at startup so a library downloaded before analysis existed catches up on its own,
+     * rather than each track staying unanalysed until the next time it happens to be re-downloaded.
+     * It is the same single-file-at-a-time queue as everything else, so it costs one core in the
+     * background and finishes whenever it finishes.
+     */
+    private suspend fun analyzeBacklog() {
+        val analysed = _state.value.analyses
+        library.listCachedTracks()
+            .filter { analysed[it.fileId]?.version != TrackAnalyzer.VERSION }
+            .forEach { analyzeInBackground(it) }
+    }
+
+    private fun analyzeInBackground(track: CachedTrack) {
+        val existing = _state.value.analyses[track.fileId]
+        if (existing != null && existing.version == TrackAnalyzer.VERSION) return
+        if (analysisJob?.isActive == true) {
+            pendingAnalysis += track
+            return
+        }
+        analysisJob = viewModelScope.launch {
+            var next: CachedTrack? = track
+            while (next != null) {
+                val current = next
+                val result = runCatching {
+                    TrackAnalysisRunner.analyze(files.file(current.relativeFilePath), current.fileId)
+                }.getOrNull()
+                if (result != null) {
+                    library.putAnalysis(result)
+                    _state.update { it.copy(analyses = it.analyses + (result.fileId to result)) }
+                }
+                next = pendingAnalysis.removeFirstOrNull()
             }
         }
     }
@@ -519,6 +584,7 @@ class PlayerViewModel(
         // Stored separately from the metadata — see the note on `ArtworkEntity`.
         artwork?.let { library.putArtwork(file.id, it) }
         _state.update { it.copy(downloadedIds = it.downloadedIds + file.id) }
+        analyzeInBackground(track)
         return track
     }
 
@@ -595,17 +661,29 @@ class PlayerViewModel(
         val nextIndex = PlaybackQueue.peekNextIndex(state.queue) ?: return
         val nextFile = state.queue.tracks.getOrNull(nextIndex) ?: return
 
+        val outgoing = state.analyses[current.id]
+        val incoming = state.analyses[nextFile.id]
+
         val plan = TransitionPlan.resolve(
             settings = TransitionSettings.AUTO,
-            outgoing = null,
-            incoming = null,
+            outgoing = outgoing,
+            incoming = incoming,
             outgoingDuration = durationMs / 1000.0,
             fallbackDuration = state.crossfadeSeconds,
             autoMixEnabled = state.autoMixEnabled,
             beatmatchEnabledByDefault = false,
         )
 
-        val startMs = ((durationMs / 1000.0 - plan.duration) * 1000).toLong()
+        // Where the transition begins. With analysis, the outgoing track's mix-out point — the
+        // moment its arrangement drops away — is where a listener would expect the next track to
+        // arrive. Without it, the only answer is "so that the transition finishes as the track
+        // ends", which is what an unanalysed library got before and still gets.
+        val duration = durationMs / 1000.0
+        val mixOut = outgoing?.mixOutSeconds?.takeIf { it > 0 && it < duration }
+        val startSeconds = plan.startSeconds
+            ?: mixOut
+            ?: (duration - plan.duration)
+        val startMs = (startSeconds * 1000).toLong()
         if (positionMs < startMs) return
 
         transitionArmedFor = current.id

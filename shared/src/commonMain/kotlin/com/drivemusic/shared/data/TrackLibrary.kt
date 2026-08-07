@@ -30,6 +30,20 @@ interface TrackLibrary {
     suspend fun putCachedTrack(track: CachedTrack)
     suspend fun deleteCachedTrack(fileId: String)
 
+    /**
+     * Every stored analysis, keyed by file id.
+     *
+     * Read whole rather than one at a time: the player needs the outgoing *and* incoming track's
+     * analysis to plan a transition, and the incoming one changes with every queue edit, so a
+     * per-track lookup would be a database round trip on the path that has to be ready before the
+     * current track ends.
+     */
+    suspend fun listAnalyses(): Map<String, com.drivemusic.shared.model.TrackAnalysis>
+    suspend fun putAnalysis(analysis: com.drivemusic.shared.model.TrackAnalysis)
+
+    /** Drops analyses produced by an older analyser, so they are recomputed rather than believed. */
+    suspend fun deleteStaleAnalyses(version: Int)
+
     suspend fun listPlaylists(): List<Playlist>
     suspend fun createPlaylist(name: String): Playlist
     suspend fun deletePlaylist(id: String)

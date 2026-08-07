@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import android.graphics.BitmapFactory
 import com.drivemusic.android.R
+import kotlin.math.roundToInt
 import com.drivemusic.android.player.PlayerViewModel
 import com.drivemusic.shared.model.DriveFile
 import com.drivemusic.shared.model.LoopMode
@@ -325,7 +326,13 @@ fun NowPlayingScreen(
             Spacer(modifier = Modifier.size(48.dp))
         }
 
-        Box(contentAlignment = Alignment.Center) {
+        // The top inset belongs to the whole stack, not to the cover alone — on the cover it
+        // shifted the artwork down 40dp and left the halo behind it, so the "shadow" sat off
+        // centre above the thing casting it.
+        Box(
+            modifier = Modifier.padding(top = 40.dp),
+            contentAlignment = Alignment.Center,
+        ) {
             if (!state.ambientGlowEnabled) {
                 // With the glow off there is nothing behind the cover at all and it sits flat on
                 // the background; with it on, the glow already does this and the two stack into
@@ -343,7 +350,6 @@ fun NowPlayingScreen(
                     // iOS sits this below a real navigation bar plus its own 16pt of vertical
                     // padding; here the header is a bare row of icon buttons, so without this the
                     // cover starts almost immediately under the status bar.
-                    .padding(top = 40.dp)
                     .size(ARTWORK_SIZE),
             )
         }
@@ -441,7 +447,11 @@ fun NowPlayingScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (state.crossfadeEnabled && state.autoMixEnabled && state.isPlaying) {
-                MixBadge()
+                // The tempo when there is one: the number is the whole reason a mixed transition
+                // works or does not, and this is the screen where the user is listening to it
+                // happen. Analysis either has not run yet or found no steady tempo otherwise, and
+                // the badge says the honest thing rather than hiding.
+                MixBadge(state.analyses[track.id]?.bpm)
             }
             Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = { queueOpen = true }, enabled = state.upNext.isNotEmpty()) {
@@ -487,7 +497,7 @@ fun NowPlayingScreen(
  * show and this says the honest thing rather than inventing one.
  */
 @Composable
-private fun MixBadge() {
+private fun MixBadge(bpm: Double?) {
     Row(
         modifier = Modifier
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
@@ -503,7 +513,8 @@ private fun MixBadge() {
             modifier = Modifier.size(14.dp),
         )
         Text(
-            stringResource(R.string.mixing),
+            bpm?.let { stringResource(R.string.mixing_lld_bpm, it.roundToInt()) }
+                ?: stringResource(R.string.mixing),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
         )

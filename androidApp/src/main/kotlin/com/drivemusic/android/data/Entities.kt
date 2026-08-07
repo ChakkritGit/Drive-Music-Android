@@ -8,6 +8,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 
@@ -47,6 +48,25 @@ data class ArtworkEntity(
 
     override fun hashCode(): Int = fileId.hashCode()
 }
+
+/**
+ * One track's analysis, in its own table.
+ *
+ * Separate from `cached_tracks` for the same reason artwork is: it is derived data with its own
+ * lifecycle — recomputed when the analyser's version changes, absent until the analysis has run —
+ * and folding it into the track row would mean rewriting every track row to store a BPM.
+ *
+ * The whole thing is stored as JSON rather than as columns. It is read as a unit, written as a
+ * unit, and never queried by any of its fields, so columns would buy nothing and cost a migration
+ * every time the analyser learns to measure something new.
+ */
+@Entity(tableName = "track_analysis")
+data class TrackAnalysisEntity(
+    @PrimaryKey val fileId: String,
+    val json: String,
+    /** Denormalised out of the JSON so a stale-version sweep does not have to parse every row. */
+    val version: Int,
+)
 
 @Entity(tableName = "playlists")
 data class PlaylistEntity(
@@ -112,6 +132,17 @@ interface LibraryDao {
     suspend fun putSingleton(value: SingletonEntity)
 
     @Query("DELETE FROM cached_tracks") suspend fun clearTracks()
+    @Query("SELECT * FROM track_analysis")
+    suspend fun allAnalyses(): List<TrackAnalysisEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putAnalysis(analysis: TrackAnalysisEntity)
+
+    @Query("DELETE FROM track_analysis WHERE version != :version")
+    suspend fun deleteStaleAnalyses(version: Int)
+
+    @Query("DELETE FROM track_analysis") suspend fun clearAnalyses()
+
     @Query("DELETE FROM artwork") suspend fun clearArtwork()
     @Query("DELETE FROM playlists") suspend fun clearPlaylists()
     @Query("DELETE FROM singletons") suspend fun clearSingletons()
@@ -123,11 +154,33 @@ interface LibraryDao {
         ArtworkEntity::class,
         PlaylistEntity::class,
         SingletonEntity::class,
+        TrackAnalysisEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
+
+    companion object {
+        /**
+         * Adds the analysis table.
+         *
+         * A real migration rather than `fallbackToDestructiveMigration`: analysis is derived and
+         * could be thrown away safely, but destroying the database to add a table would take the
+         * user's playlists and their whole downloaded library index with it.
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `track_analysis` (" +
+                        "`fileId` TEXT NOT NULL, " +
+                        "`json` TEXT NOT NULL, " +
+                        "`version` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`fileId`))"
+                )
+            }
+        }
+    }
 }

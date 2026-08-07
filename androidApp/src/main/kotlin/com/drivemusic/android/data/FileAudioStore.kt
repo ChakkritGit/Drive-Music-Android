@@ -37,6 +37,14 @@ class FileAudioStore(context: Context) : AudioFileStore {
         name
     }
 
+    /**
+     * The file itself, for the analyser.
+     *
+     * Not part of [AudioFileStore]: that interface is shared with iOS, where there is no
+     * `java.io.File`, and the analyser is the only caller that needs a path rather than a URI.
+     */
+    fun file(relativePath: String): File = File(root, relativePath)
+
     override suspend fun uri(relativePath: String): String =
         File(root, relativePath).toURI().toString()
 
