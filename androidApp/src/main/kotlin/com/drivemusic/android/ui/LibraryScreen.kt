@@ -151,7 +151,7 @@ fun LibraryScreen(
                     onAddToPlaylist = { onAddToPlaylist(track.driveMeta) },
                     onRemove = { viewModel.removeDownload(track.fileId) },
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                TrackDivider()
         }
     }
 }

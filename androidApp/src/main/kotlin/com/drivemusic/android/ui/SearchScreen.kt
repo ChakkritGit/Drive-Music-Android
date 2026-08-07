@@ -74,7 +74,7 @@ fun SearchScreen(
                         },
                         onAddToPlaylist = { onAddToPlaylist(track.driveMeta) },
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                    TrackDivider()
                 }
             }
         }

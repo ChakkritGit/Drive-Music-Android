@@ -219,3 +219,23 @@ private fun RowArtwork(
         }
     }
 }
+
+/**
+ * The rule between track rows.
+ *
+ * Inset to where the title starts rather than run edge to edge: a full-width rule cuts through the
+ * artwork column, which reads as a line drawn across the covers instead of a line between rows.
+ * Starting it under the text lets the covers form their own uninterrupted column, and the reader
+ * gets the grouping for free.
+ *
+ * Pulled in on the right too, so the rule sits inside the screen's margin instead of running into
+ * its edge.
+ */
+@Composable
+fun TrackDivider() {
+    androidx.compose.material3.HorizontalDivider(
+        // 12dp of row padding, a 40dp cover, 12dp of spacing — where the title begins.
+        modifier = Modifier.padding(start = 64.dp, end = 16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    )
+}

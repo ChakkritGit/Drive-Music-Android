@@ -109,7 +109,7 @@ fun CollectionDetailScreen(
                     },
                     onAddToPlaylist = { onAddToPlaylist(file) },
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                TrackDivider()
             }
         }
     }
