@@ -9,14 +9,14 @@ Scaffold plus the first slice of shared logic. Builds and passes on every target
 
 | Task | Result |
 | --- | --- |
-| `:shared:testDebugUnitTest` | 84 tests, 0 failures |
-| `:shared:iosSimulatorArm64Test` | 84 tests, 0 failures |
+| `:shared:testDebugUnitTest` | 96 tests, 0 failures |
+| `:shared:iosSimulatorArm64Test` | 96 tests, 0 failures |
 | `:androidApp:testDebugUnitTest` | 29 tests, 0 failures |
 | `:androidApp:connectedDebugAndroidTest` | 5 tests, 0 failures (emulator, API 36) |
 | `:shared:linkReleaseFrameworkIosArm64` | `DriveMusicShared.framework` produced |
 | `:androidApp:assembleDebug` | APK produced |
 
-The 84 shared tests run on both the Android and iOS targets from `commonTest`, which is the point
+The 96 shared tests run on both the Android and iOS targets from `commonTest`, which is the point
 — the shared logic is verified on each platform that will actually run it, not just on one.
 
 ## Why the split is where it is
@@ -177,8 +177,32 @@ Every lane of a `TransitionShape` is now applied:
 Remaining limitation: sample format is 16-bit PCM only; float output is declined and Media3
 converts.
 
+## Running it
+
+The app signs in, browses Drive, downloads, plays, and mixes between tracks.
+
+Sign-in needs a device with a real Google account — the emulator's account flow launches correctly
+but there is nothing to sign in *as* unless an account has been added to it. A physical phone is
+the easier path.
+
+The Android OAuth client is registered against the app's package name and the signing
+certificate's SHA-1, which is why no client ID appears anywhere in the source. A consequence worth
+knowing: a build signed with a different key is a different client to Google, so a second
+developer machine's debug keystore, or a release build, needs its own SHA-1 registered or
+authorization fails with a bare `ApiException`. Get the current one with:
+
+```
+./gradlew :androidApp:signingReport
+```
+
+Scopes requested are `drive.readonly` and `userinfo.email`. Read-only because this app plays a
+library and never modifies one, and asking for write access it does not use is a worse consent
+screen for no benefit.
+
 ## Not started
 
-Persistence (Room), networking, Google auth, sync, the audio engine, and the entire UI. The audio
-engine is the piece worth prototyping before committing to the rest — if a two-slot crossfade with
-per-slot filtering does not work well on Media3, that changes the plan for everything downstream.
+Sync (the PartyKit room), playlists in the UI, the transition editor, and track analysis. Analysis
+is the significant one: without it the mix-in and mix-out points are unknown, so `TransitionPlan`
+falls back to "the transition finishes as the track ends" and the incoming track starts at 0:00.
+Everything downstream of it already exists and is tested — see the note on the Java heap above
+before porting the FFT.

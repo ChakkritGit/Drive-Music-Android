@@ -63,7 +63,9 @@ data class DriveFile(
             return trimmed
         }
 
-    private companion object {
-        val TRACK_NUMBER_PREFIX = Regex("""^(?:\d{1,2}\s*[-–._]\s*|0\d\s+)""")
+    // Not private: `@Serializable` generates `serializer()` on this same companion, and making
+    // the whole object private hides that from everything outside this file.
+    companion object {
+        private val TRACK_NUMBER_PREFIX = Regex("""^(?:\d{1,2}\s*[-–._]\s*|0\d\s+)""")
     }
 }
