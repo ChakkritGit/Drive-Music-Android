@@ -62,6 +62,17 @@ class CrossfadeEngine(
 
     private var rampJob: Job? = null
 
+    /**
+     * The listener's tone preference. Held here rather than passed per transition because it is a
+     * standing setting: it applies to whatever is playing, including between transitions, and
+     * re-applying it on every parameter write is what keeps a mix from resetting it.
+     */
+    var eq: EqSettings = EqSettings.flat
+        set(value) {
+            field = value
+            processors.values.forEach { it.parameters = it.parameters.copy(eq = value) }
+        }
+
     fun player(slot: PlaybackSlot): ExoPlayer = players.getValue(slot)
 
     /**
@@ -131,8 +142,8 @@ class CrossfadeEngine(
             playbackParameters = PlaybackParameters(plan.incomingRate)
             playWhenReady = true
         }
-        processors.getValue(incoming).parameters = SlotAutomation.incoming(plan.shape, 0.0)
-        processors.getValue(outgoing).parameters = SlotAutomation.outgoing(plan.shape, 0.0)
+        processors.getValue(incoming).parameters = SlotAutomation.incoming(plan.shape, 0.0, eq)
+        processors.getValue(outgoing).parameters = SlotAutomation.outgoing(plan.shape, 0.0, eq)
 
         rampJob = scope.launch {
             val durationMs = (plan.duration * 1000).toLong().coerceAtLeast(1)
@@ -140,8 +151,8 @@ class CrossfadeEngine(
             while (isActive) {
                 val elapsed = System.currentTimeMillis() - startedAt
                 val t = (elapsed.toDouble() / durationMs).coerceIn(0.0, 1.0)
-                processors.getValue(outgoing).parameters = SlotAutomation.outgoing(plan.shape, t)
-                processors.getValue(incoming).parameters = SlotAutomation.incoming(plan.shape, t)
+                processors.getValue(outgoing).parameters = SlotAutomation.outgoing(plan.shape, t, eq)
+                processors.getValue(incoming).parameters = SlotAutomation.incoming(plan.shape, t, eq)
                 if (t >= 1.0) break
                 delay(RAMP_INTERVAL_MS)
             }
@@ -152,11 +163,11 @@ class CrossfadeEngine(
                 // Cleared or the slot would still be a looping clip the next time it is used.
                 repeatMode = Player.REPEAT_MODE_OFF
             }
-            processors.getValue(outgoing).parameters = SlotParameters.silent
+            processors.getValue(outgoing).parameters = SlotParameters.silent.copy(eq = eq)
             // The incoming slot is now simply playing, so its chain has to be open — leaving it at
             // the transition's end state would keep whatever filtering the last keyframe held for
             // the rest of the track.
-            processors.getValue(incoming).parameters = SlotParameters.open
+            processors.getValue(incoming).parameters = SlotParameters.open.copy(eq = eq)
             player(incoming).playbackParameters = PlaybackParameters(1f)
 
             activeSlot = incoming
@@ -204,8 +215,8 @@ class CrossfadeEngine(
         rampJob = null
         isTransitioning = false
 
-        processors.getValue(activeSlot).parameters = SlotParameters.open
-        processors.getValue(activeSlot.other).parameters = SlotParameters.silent
+        processors.getValue(activeSlot).parameters = SlotParameters.open.copy(eq = eq)
+        processors.getValue(activeSlot.other).parameters = SlotParameters.silent.copy(eq = eq)
         player(activeSlot.other).apply {
             stop()
             playbackParameters = PlaybackParameters(1f)

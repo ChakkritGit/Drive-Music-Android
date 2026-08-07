@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -54,6 +55,8 @@ fun BrowseScreen(
     onPlay: (List<DriveFile>, Int, PlaySource) -> Unit,
     onShuffle: (List<DriveFile>, PlaySource) -> Unit,
     onQueue: (DriveFile) -> Unit,
+    onAddToPlaylist: (DriveFile) -> Unit,
+    onDownloadAll: (List<DriveFile>) -> Unit,
 ) {
     var stack by remember { mutableStateOf(listOf(Crumb("root", "My Drive"))) }
     var items by remember { mutableStateOf<List<DriveFile>>(emptyList()) }
@@ -98,6 +101,10 @@ fun BrowseScreen(
                 onPlay = { onPlay(audioFiles, 0, source) },
                 onShuffle = { onShuffle(audioFiles, source) },
             )
+            androidx.compose.material3.TextButton(
+                onClick = { onDownloadAll(audioFiles) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            ) { Text("Download all") }
         }
 
         when {
@@ -113,11 +120,12 @@ fun BrowseScreen(
                     if (file.isFolder) {
                         FolderRow(file) { stack = stack + Crumb(file.id, file.displayName) }
                     } else {
-                        TrackRow(
+                        BrowseTrackRow(
                             file = file,
                             isDownloaded = file.id in downloadedIds,
                             onClick = { onPlay(audioFiles, audioFiles.indexOfFirst { it.id == file.id }, source) },
                             onQueue = { onQueue(file) },
+                            onAddToPlaylist = { onAddToPlaylist(file) },
                         )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
@@ -146,6 +154,8 @@ fun TrackRow(
     isPlaying: Boolean = false,
     onClick: () -> Unit,
     onQueue: (() -> Unit)? = null,
+    queueIcon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.Add,
+    queueLabel: String = "Play next",
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
@@ -176,7 +186,60 @@ fun TrackRow(
         }
         if (onQueue != null) {
             IconButton(onClick = onQueue) {
-                Icon(Icons.Default.Add, contentDescription = "Play next")
+                Icon(queueIcon, contentDescription = queueLabel)
+            }
+        }
+    }
+}
+
+/** A browse row with the overflow menu the library rows have. */
+@Composable
+private fun BrowseTrackRow(
+    file: DriveFile,
+    isDownloaded: Boolean,
+    onClick: () -> Unit,
+    onQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(
+            Icons.Default.MusicNote,
+            contentDescription = null,
+            tint = Color.Gray,
+            modifier = Modifier.size(20.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(file.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (isDownloaded) {
+                Text(
+                    "Downloaded",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+        }
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "More")
+            }
+            androidx.compose.material3.DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+            ) {
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text("Play next") },
+                    onClick = { onQueue(); menuOpen = false },
+                )
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text("Add to playlist") },
+                    onClick = { onAddToPlaylist(); menuOpen = false },
+                )
             }
         }
     }

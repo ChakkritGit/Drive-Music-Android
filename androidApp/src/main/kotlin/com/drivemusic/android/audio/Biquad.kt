@@ -105,6 +105,51 @@ class Biquad {
             )
         }
 
+        /** Peaking band, for the midrange tone control. */
+        fun peaking(
+            frequency: Double,
+            gainDb: Double,
+            sampleRate: Double,
+            q: Double = 1.0,
+        ): Coefficients {
+            if (gainDb == 0.0) return Coefficients.bypass
+            val a = 10.0.pow(gainDb / 40)
+            val w0 = 2 * PI * frequency / sampleRate
+            val cosW0 = cos(w0)
+            val alpha = sin(w0) / (2 * q)
+            val a0 = 1 + alpha / a
+            return Coefficients(
+                b0 = (1 + alpha * a) / a0,
+                b1 = (-2 * cosW0) / a0,
+                b2 = (1 - alpha * a) / a0,
+                a1 = (-2 * cosW0) / a0,
+                a2 = (1 - alpha / a) / a0,
+            )
+        }
+
+        /** High shelf, for the treble tone control. */
+        fun highShelf(
+            frequency: Double,
+            gainDb: Double,
+            sampleRate: Double,
+            slope: Double = 1.0,
+        ): Coefficients {
+            if (gainDb == 0.0) return Coefficients.bypass
+            val a = 10.0.pow(gainDb / 40)
+            val w0 = 2 * PI * frequency / sampleRate
+            val cosW0 = cos(w0)
+            val alpha = sin(w0) / 2 * sqrt((a + 1 / a) * (1 / slope - 1) + 2)
+            val twoSqrtAAlpha = 2 * sqrt(a) * alpha
+            val a0 = (a + 1) - (a - 1) * cosW0 + twoSqrtAAlpha
+            return Coefficients(
+                b0 = (a * ((a + 1) + (a - 1) * cosW0 + twoSqrtAAlpha)) / a0,
+                b1 = (-2 * a * ((a - 1) + (a + 1) * cosW0)) / a0,
+                b2 = (a * ((a + 1) + (a - 1) * cosW0 - twoSqrtAAlpha)) / a0,
+                a1 = (2 * ((a - 1) - (a + 1) * cosW0)) / a0,
+                a2 = ((a + 1) - (a - 1) * cosW0 - twoSqrtAAlpha) / a0,
+            )
+        }
+
         /**
          * Low shelf — the bass swap. A shelf rather than a high-pass sweep because the point is to
          * take a track's low end *down* by a known amount while leaving its character intact, not

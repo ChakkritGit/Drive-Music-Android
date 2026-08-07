@@ -48,6 +48,11 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
     private var lowPass: Array<Biquad> = emptyArray()
     private var bass: Array<Biquad> = emptyArray()
     private var reverb: Array<Reverb> = emptyArray()
+    // The user's tone controls, applied after the transition's own filtering so a bass swap can
+    // never cancel a standing preference.
+    private var eqBass: Array<Biquad> = emptyArray()
+    private var eqMid: Array<Biquad> = emptyArray()
+    private var eqTreble: Array<Biquad> = emptyArray()
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         // 16-bit PCM only. Media3 hands float buffers through when float output is enabled, and
@@ -62,6 +67,9 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         lowPass = Array(channelCount) { Biquad() }
         bass = Array(channelCount) { Biquad() }
         reverb = Array(channelCount) { Reverb(inputAudioFormat.sampleRate.toDouble()) }
+        eqBass = Array(channelCount) { Biquad() }
+        eqMid = Array(channelCount) { Biquad() }
+        eqTreble = Array(channelCount) { Biquad() }
         updateCoefficients(parameters)
         return inputAudioFormat
     }
@@ -82,10 +90,22 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         // vocal and snare body alone, which is what makes a swap sound like a handover instead of
         // a filter sweep.
         val shelf = Biquad.lowShelf(BASS_SHELF_HZ, value.bassDb, rate)
+
+        val eq = value.eq
+        val toneBass = if (eq.isFlat) Biquad.Coefficients.bypass
+            else Biquad.lowShelf(EQ_BASS_HZ, eq.bassDb, rate)
+        val toneMid = if (eq.isFlat) Biquad.Coefficients.bypass
+            else Biquad.peaking(EQ_MID_HZ, eq.midDb, rate)
+        val toneTreble = if (eq.isFlat) Biquad.Coefficients.bypass
+            else Biquad.highShelf(EQ_TREBLE_HZ, eq.trebleDb, rate)
+
         for (channel in 0 until channelCount) {
             highPass[channel].coefficients = hp
             lowPass[channel].coefficients = lp
             bass[channel].coefficients = shelf
+            eqBass[channel].coefficients = toneBass
+            eqMid[channel].coefficients = toneMid
+            eqTreble[channel].coefficients = toneTreble
         }
     }
 
@@ -98,6 +118,7 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         val current = parameters
         val volume = current.volume
         val wet = (current.reverbWet / 100).coerceIn(0.0, 1.0)
+        val toneEnabled = !current.eq.isFlat
 
         for (frame in 0 until frames) {
             for (channel in 0 until channelCount) {
@@ -111,6 +132,11 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
                     // large room, not like it has been replaced by its own echo.
                     val tail = reverb[channel].process(sample.toFloat()).toDouble()
                     sample = sample * (1 - wet * 0.5) + tail * wet
+                }
+                if (toneEnabled) {
+                    sample = eqBass[channel].process(sample)
+                    sample = eqMid[channel].process(sample)
+                    sample = eqTreble[channel].process(sample)
                 }
                 sample *= volume
                 // Clipped, not wrapped. A shelf boost or a resonant corner can push a sample past
@@ -143,10 +169,16 @@ class TransitionAudioProcessor : BaseAudioProcessor() {
         bass.forEach { it.reset() }
         // A reverb tail that survives a seek is the previous position still audibly ringing.
         reverb.forEach { it.clear() }
+        eqBass.forEach { it.reset() }
+        eqMid.forEach { it.reset() }
+        eqTreble.forEach { it.reset() }
     }
 
     companion object {
         const val BASS_SHELF_HZ = 250.0
+        const val EQ_BASS_HZ = 100.0
+        const val EQ_MID_HZ = 1_000.0
+        const val EQ_TREBLE_HZ = 6_000.0
         private const val SHORT_SCALE = 32768.0
         private const val MIN_SHORT = -32768
         private const val MAX_SHORT = 32767

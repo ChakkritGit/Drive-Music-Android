@@ -2,6 +2,7 @@ package com.drivemusic.android
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,8 +11,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,13 +33,17 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.media3.common.util.UnstableApi
 import com.drivemusic.android.auth.GoogleAuth
 import com.drivemusic.android.player.PlayerViewModel
-import com.drivemusic.android.ui.BrowseScreen
-import com.drivemusic.android.ui.MiniPlayer
-import com.drivemusic.android.ui.NowPlayingScreen
+import androidx.compose.ui.platform.LocalContext
+import com.drivemusic.android.ui.AppShell
 
 @UnstableApi
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Explicit rather than inherited from the platform default. From API 35 an app is
+        // edge-to-edge whether it asks or not, so the choice is not *whether* content draws behind
+        // the system bars but whether the app admits it and pads accordingly. Saying so here keeps
+        // the behavior the same on older versions too, instead of it changing with the OS.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val container = AppContainer.get(this)
 
@@ -108,7 +115,7 @@ private fun SignInButton(container: AppContainer) {
 @UnstableApi
 @Composable
 private fun SignedInApp(container: AppContainer) {
-    val application = androidx.compose.ui.platform.LocalContext.current.applicationContext as android.app.Application
+    val application = LocalContext.current.applicationContext as android.app.Application
     val viewModel: PlayerViewModel = viewModel(
         factory = viewModelFactory {
             initializer {
@@ -116,32 +123,10 @@ private fun SignedInApp(container: AppContainer) {
             }
         }
     )
-    val state by viewModel.state.collectAsState()
-    var showNowPlaying by remember { mutableStateOf(false) }
-
-    if (showNowPlaying && state.currentTrack != null) {
-        NowPlayingScreen(state, viewModel) { showNowPlaying = false }
-        return
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.weight(1f)) {
-            BrowseScreen(
-                drive = container.drive,
-                downloadedIds = state.downloadedIds,
-                onPlay = viewModel::play,
-                onShuffle = { tracks, source -> viewModel.shufflePlay(tracks, source) },
-                onQueue = viewModel::addToQueue,
-            )
-        }
-        state.error?.let {
-            Text(it, modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
-        }
-        MiniPlayer(state, viewModel) { showNowPlaying = true }
-    }
+    AppShell(container, viewModel) { container.auth.signOut() }
 }
 
 @Composable
 private fun Centered(content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) { content() }
+    Box(Modifier.fillMaxSize().safeDrawingPadding().padding(32.dp), Alignment.Center) { content() }
 }

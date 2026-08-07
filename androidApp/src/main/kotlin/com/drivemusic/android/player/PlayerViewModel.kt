@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import com.drivemusic.android.audio.CrossfadeEngine
+import com.drivemusic.android.audio.EqSettings
 import com.drivemusic.android.audio.PlaybackSlot
 import com.drivemusic.android.data.FileAudioStore
 import com.drivemusic.android.data.RoomTrackLibrary
@@ -16,6 +17,7 @@ import com.drivemusic.shared.model.DriveFile
 import com.drivemusic.shared.model.LoopMode
 import com.drivemusic.shared.model.ParsedMetadata
 import com.drivemusic.shared.model.PlaySource
+import com.drivemusic.shared.model.Playlist
 import com.drivemusic.shared.model.PlaybackSession
 import com.drivemusic.shared.playback.PlaybackQueue
 import com.drivemusic.shared.playback.PlaybackQueueState
@@ -62,17 +64,32 @@ class PlayerViewModel(
         val error: String? = null,
         val crossfadeEnabled: Boolean = true,
         val autoMixEnabled: Boolean = true,
+        val gaplessEnabled: Boolean = true,
+        val volumeNormalizationEnabled: Boolean = true,
         val crossfadeSeconds: Double = 8.0,
+        val eq: EqSettings = EqSettings.flat,
         val downloadedIds: Set<String> = emptySet(),
+        val cachedTracks: List<CachedTrack> = emptyList(),
+        val playlists: List<Playlist> = emptyList(),
+        val cacheBytes: Long = 0,
+        val downloadProgress: Pair<Int, Int>? = null,
     ) {
         val currentTrack: DriveFile? get() = queue.currentTrack
         val upNext get() = PlaybackQueue.upNext(queue)
+
+        /** Downloaded tracks grouped by artist, for the Home shelves. */
+        val artists: List<Pair<String, List<CachedTrack>>>
+            get() = cachedTracks
+                .groupBy { it.parsedMeta.artist?.takeIf(String::isNotBlank) ?: "Unknown artist" }
+                .toList()
+                .sortedBy { it.first.lowercase() }
     }
 
     private val engine = CrossfadeEngine(application, viewModelScope)
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    private val settings = SettingsStore(application)
     private var model = RecommendationModel.createDefault()
     private var tickJob: Job? = null
     private var loadJob: Job? = null
@@ -81,9 +98,42 @@ class PlayerViewModel(
     private var transitionArmedFor: String? = null
 
     init {
+        // Duration comes from a listener rather than from the progress tick, because the tick only
+        // runs while playing — so a restored session, which loads paused, showed "0:00" for its
+        // length and an empty scrubber until the user pressed play. Registered on both slots and
+        // filtered to the active one, since the inactive slot is routinely holding a different
+        // track mid-transition.
+        PlaybackSlot.entries.forEach { slot ->
+            engine.player(slot).addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState != Player.STATE_READY || engine.activeSlot != slot) return
+                    val player = engine.player(slot)
+                    _state.update {
+                        it.copy(
+                            durationMs = player.duration.takeIf { d -> d > 0 } ?: 0L,
+                            positionMs = player.currentPosition,
+                        )
+                    }
+                }
+            })
+        }
+
+        val stored = settings.eq
+        engine.eq = stored
+        _state.update {
+            it.copy(
+                crossfadeEnabled = settings.crossfadeEnabled,
+                crossfadeSeconds = settings.crossfadeSeconds,
+                autoMixEnabled = settings.autoMixEnabled,
+                gaplessEnabled = settings.gaplessEnabled,
+                volumeNormalizationEnabled = settings.volumeNormalizationEnabled,
+                eq = stored,
+            )
+        }
+
         viewModelScope.launch {
             model = library.loadModel()
-            _state.update { it.copy(downloadedIds = library.listCachedTrackIds()) }
+            refreshLibrary()
             restoreSession()
         }
     }
@@ -179,13 +229,146 @@ class PlayerViewModel(
         persistSession()
     }
 
-    fun setCrossfadeEnabled(enabled: Boolean) = _state.update { it.copy(crossfadeEnabled = enabled) }
-    fun setAutoMixEnabled(enabled: Boolean) = _state.update { it.copy(autoMixEnabled = enabled) }
-    fun setCrossfadeSeconds(seconds: Double) = _state.update { it.copy(crossfadeSeconds = seconds) }
+    // MARK: - Settings
+
+    fun setCrossfadeEnabled(enabled: Boolean) {
+        settings.crossfadeEnabled = enabled
+        _state.update { it.copy(crossfadeEnabled = enabled) }
+    }
+
+    fun setAutoMixEnabled(enabled: Boolean) {
+        settings.autoMixEnabled = enabled
+        _state.update { it.copy(autoMixEnabled = enabled) }
+    }
+
+    fun setCrossfadeSeconds(seconds: Double) {
+        settings.crossfadeSeconds = seconds
+        _state.update { it.copy(crossfadeSeconds = seconds) }
+    }
+
+    fun setGaplessEnabled(enabled: Boolean) {
+        settings.gaplessEnabled = enabled
+        _state.update { it.copy(gaplessEnabled = enabled) }
+    }
+
+    fun setVolumeNormalizationEnabled(enabled: Boolean) {
+        settings.volumeNormalizationEnabled = enabled
+        _state.update { it.copy(volumeNormalizationEnabled = enabled) }
+    }
+
+    fun setEq(eq: EqSettings) {
+        settings.eq = eq
+        engine.eq = eq
+        _state.update { it.copy(eq = eq) }
+    }
+
+    // MARK: - Library and playlists
+
+    /** Re-reads what is downloaded and what playlists exist. */
+    fun refreshLibrary() {
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    cachedTracks = library.listCachedTracks(),
+                    downloadedIds = library.listCachedTrackIds(),
+                    playlists = library.listPlaylists(),
+                    cacheBytes = files.totalBytes(),
+                )
+            }
+        }
+    }
+
+    fun createPlaylist(name: String) {
+        viewModelScope.launch {
+            library.createPlaylist(name)
+            refreshLibrary()
+        }
+    }
+
+    fun deletePlaylist(id: String) {
+        viewModelScope.launch {
+            library.deletePlaylist(id)
+            refreshLibrary()
+        }
+    }
+
+    fun addToPlaylist(playlistId: String, file: DriveFile) {
+        viewModelScope.launch {
+            library.addTrackToPlaylist(playlistId, file)
+            refreshLibrary()
+        }
+    }
+
+    fun removeFromPlaylist(playlistId: String, fileId: String) {
+        viewModelScope.launch {
+            library.removeTrackFromPlaylist(playlistId, fileId)
+            refreshLibrary()
+        }
+    }
+
+    /** Downloads every track in [files] that is not already cached, reporting progress. */
+    fun downloadAll(tracks: List<DriveFile>) {
+        viewModelScope.launch {
+            val pending = tracks.filterNot { it.id in _state.value.downloadedIds }
+            if (pending.isEmpty()) return@launch
+            _state.update { it.copy(downloadProgress = 0 to pending.size) }
+            pending.forEachIndexed { index, file ->
+                runCatching { ensureCached(file) }
+                _state.update { it.copy(downloadProgress = (index + 1) to pending.size) }
+            }
+            _state.update { it.copy(downloadProgress = null) }
+            refreshLibrary()
+        }
+    }
+
+    fun removeDownload(fileId: String) {
+        viewModelScope.launch {
+            library.getCachedTrack(fileId)?.let { files.delete(it.relativeFilePath) }
+            library.deleteCachedTrack(fileId)
+            refreshLibrary()
+        }
+    }
+
+    /** The danger-zone action: every download, every playlist, the model, the session. */
+    fun clearAllData() {
+        viewModelScope.launch {
+            engine.cancelTransition()
+            PlaybackSlot.entries.forEach { engine.player(it).stop() }
+            stopTicking()
+            library.clearAll()
+            files.clearAll()
+            model = RecommendationModel.createDefault()
+            _state.value = UiState(
+                crossfadeEnabled = settings.crossfadeEnabled,
+                crossfadeSeconds = settings.crossfadeSeconds,
+                autoMixEnabled = settings.autoMixEnabled,
+                gaplessEnabled = settings.gaplessEnabled,
+                volumeNormalizationEnabled = settings.volumeNormalizationEnabled,
+                eq = settings.eq,
+            )
+        }
+    }
+
+    /** Cover art for one track, by id — never carried on the track itself. */
+    suspend fun artworkFor(fileId: String): ByteArray? = library.artwork(fileId)
+
+    /** The tracks the model thinks the listener wants right now — the Home "Made for you" shelf. */
+    fun recommended(limit: Int = 12): List<CachedTrack> {
+        val now = Clock.System.now()
+        return _state.value.cachedTracks
+            .map { it to RecommendationModel.predict(model, Features.extract(it.driveMeta, it.parsedMeta, now)) }
+            .sortedByDescending { it.second }
+            .take(limit)
+            .map { it.first }
+    }
 
     // MARK: - Loading
 
-    private fun loadCurrent(autoplay: Boolean) {
+    /**
+     * @param seekToMs where to start. Non-zero only when resuming a saved session — every other
+     *   load is a fresh selection and starts at the top.
+     */
+    private fun loadCurrent(autoplay: Boolean, seekToMs: Long = 0) {
         val file = _state.value.currentTrack ?: return
         loadJob?.cancel()
         transitionArmedFor = null
@@ -197,12 +380,14 @@ class PlayerViewModel(
                 val slot = engine.activeSlot
                 engine.prepare(slot, files.uri(track.relativeFilePath))
                 val player = engine.player(slot)
+                if (seekToMs > 0) player.seekTo(seekToMs)
                 player.playWhenReady = autoplay
 
                 _state.update {
                     it.copy(
                         isLoading = false,
                         isPlaying = autoplay,
+                        positionMs = seekToMs,
                         metadata = track.parsedMeta,
                         artwork = library.artwork(track.fileId),
                     )
@@ -343,12 +528,17 @@ class PlayerViewModel(
             val queue = PlaybackQueue.consumePlayNext(
                 _state.value.queue.copy(currentIndex = index), index
             )
+            val player = engine.player(slot)
             _state.update {
                 it.copy(
                     queue = queue,
                     metadata = track.parsedMeta,
                     artwork = library.artwork(track.fileId),
                     isPlaying = true,
+                    // Read here as well as from the listener: the incoming slot reached READY
+                    // while it was still the *inactive* one, so the listener declined it.
+                    durationMs = player.duration.takeIf { d -> d > 0 } ?: 0L,
+                    positionMs = player.currentPosition,
                 )
             }
             transitionArmedFor = null
@@ -404,7 +594,9 @@ class PlayerViewModel(
         val queue = session.toQueueState()
         if (queue.currentTrack == null) return
         _state.update { it.copy(queue = queue, source = session.source) }
-        loadCurrent(autoplay = false)
+        // Resumed where it left off, but paused — a launch that starts playing on its own is a
+        // surprise, and the position is what makes "resume" mean anything.
+        loadCurrent(autoplay = false, seekToMs = (session.progress * 1000).toLong())
     }
 
     override fun onCleared() {

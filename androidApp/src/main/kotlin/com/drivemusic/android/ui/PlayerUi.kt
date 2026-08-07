@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -32,9 +34,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -102,6 +106,9 @@ fun MiniPlayer(state: PlayerViewModel.UiState, viewModel: PlayerViewModel, onExp
     val track = state.currentTrack ?: return
 
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
+        // No inset padding here: the mini player sits directly above the navigation bar, which
+        // Material3 already insets itself. Padding both left a gap the height of the gesture bar
+        // between them.
         Column {
             LinearProgressIndicator(
                 progress = {
@@ -154,15 +161,33 @@ fun NowPlayingScreen(
 ) {
     val track = state.currentTrack ?: return
     var scrubbing by remember { mutableStateOf<Float?>(null) }
+    var queueOpen by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        // Full-screen and outside the Scaffold, so it pads itself. `safeDrawing` rather than
+        // `statusBars`: it also covers the gesture bar and any display cutout, which is what the
+        // Up Next list at the bottom of this screen would otherwise run under.
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) {
                 Icon(Icons.Default.Close, contentDescription = "Close")
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                state.source?.let {
+                    Text(
+                        "Playing from ${it.name}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            IconButton(onClick = { queueOpen = true }) {
+                Icon(Icons.Default.QueueMusic, contentDescription = "Queue")
             }
         }
 
@@ -240,20 +265,55 @@ fun NowPlayingScreen(
             }
         }
 
-        if (state.upNext.isNotEmpty()) {
+    }
+
+    if (queueOpen) {
+        QueueSheet(state, viewModel) { queueOpen = false }
+    }
+}
+
+/**
+ * The queue, as a sheet rather than a list under the transport.
+ *
+ * Inline it competed with the controls for vertical space, and on a short phone the transport was
+ * the thing that lost — a player whose play button can be scrolled away is the wrong trade.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun QueueSheet(
+    state: PlayerViewModel.UiState,
+    viewModel: PlayerViewModel,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Text(
                 "Next up",
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                itemsIndexed(state.upNext, key = { _, entry -> entry.index }) { _, entry ->
-                    TrackRow(
-                        file = entry.file,
-                        isDownloaded = entry.file.id in state.downloadedIds,
-                        onClick = { viewModel.jumpTo(entry.index) },
-                        onQueue = null,
-                    )
+            if (state.upNext.isEmpty()) {
+                Text(
+                    "Nothing queued after this track.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(16.dp),
+                )
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                    itemsIndexed(state.upNext, key = { _, entry -> entry.index }) { _, entry ->
+                        TrackRow(
+                            file = entry.file,
+                            isDownloaded = entry.file.id in state.downloadedIds,
+                            onClick = { viewModel.jumpTo(entry.index); onDismiss() },
+                            onQueue = { viewModel.removeFromQueue(entry.index) },
+                            queueIcon = Icons.Default.Close,
+                            queueLabel = "Remove from queue",
+                        )
+                    }
                 }
             }
         }

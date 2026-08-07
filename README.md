@@ -199,9 +199,33 @@ Scopes requested are `drive.readonly` and `userinfo.email`. Read-only because th
 library and never modifies one, and asking for write access it does not use is a worse consent
 screen for no benefit.
 
+## The app
+
+Five tabs, Material 3 throughout — the *structure* follows the iOS app rather than its look, since
+imitating one platform's chrome on the other reads as wrong on both.
+
+- **Home** — Recently added, Made for you (ranked by the shared recommendation model), playlists,
+  artists. Built entirely from what is downloaded, so it works offline and costs no network.
+- **Browse** — the Drive folder tree, with Play, Shuffle, Download all, and per-track Play
+  next / Add to playlist.
+- **Library** — everything downloaded, sorted by name, date added, artist or album, with
+  Remove download.
+- **Playlists** — create, delete, open, reorderless track lists, Download all.
+- **Settings** — crossfade on/off and length, auto mix, gapless, volume normalization, a real
+  3-band EQ, storage used, sign out, and a confirmed Clear all data.
+
+Now Playing is a full-screen takeover with artwork, scrubbing, the full transport, shuffle and
+repeat, and the queue as a bottom sheet. Everything sits inside the window insets: from API 35 an
+app is edge-to-edge whether it asks or not, so the choice is not whether content draws behind the
+system bars but whether the app admits it.
+
+The EQ is not decorative — it runs as three biquad sections inside the same per-slot chain the
+transitions use, applied after the transition's own filtering so a bass swap can never cancel a
+standing preference.
+
 ## Not started
 
-Sync (the PartyKit room), playlists in the UI, the transition editor, and track analysis. Analysis
+Sync (the PartyKit room), the transition editor, and track analysis. Analysis
 is the significant one: without it the mix-in and mix-out points are unknown, so `TransitionPlan`
 falls back to "the transition finishes as the track ends" and the incoming track starts at 0:00.
 Everything downstream of it already exists and is tested — see the note on the Java heap above
