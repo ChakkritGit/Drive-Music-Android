@@ -64,10 +64,13 @@ fun AmbientGlow(
 
         drawCircle(
             brush = Brush.radialGradient(
+                // The last stop is the same colour at zero alpha, not `Color.Transparent` —
+                // which is transparent *black*, so the wash graded through grey before it
+                // disappeared instead of simply thinning out.
                 colors = listOf(
                     color.copy(alpha = 0.55f),
                     color.copy(alpha = 0.18f),
-                    Color.Transparent,
+                    color.copy(alpha = 0f),
                 ),
                 center = center,
                 radius = radius,

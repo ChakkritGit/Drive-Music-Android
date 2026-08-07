@@ -10,6 +10,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
@@ -74,7 +78,10 @@ fun MixGlow(scale: Float, alpha: Float, modifier: Modifier = Modifier) {
 private fun DrawScope.haze(color: Color, alpha: Float, radius: Float) {
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(color.copy(alpha = alpha), Color.Transparent),
+            // Fading to the accent at zero alpha, not to `Color.Transparent` — which is
+            // transparent *black*, so the ramp ran through dark greys on its way out and the glow
+            // showed a black core behind the button instead of light.
+            colors = listOf(color.copy(alpha = alpha), color.copy(alpha = 0f)),
             center = center,
             radius = radius,
         ),
@@ -107,9 +114,43 @@ private fun DrawScope.strand(
         secondaryPhase = time * secondarySpeed * 2 * PI + offset,
         radius = STRAND_RADIUS.dp.toPx() * scale,
     )
-    drawPath(path, color.copy(alpha = 0.22f * alpha), style = Stroke(width = 7.dp.toPx()))
-    drawPath(path, color.copy(alpha = 0.5f * alpha), style = Stroke(width = 2.5.dp.toPx()))
+
+    // The two wide passes are genuinely blurred, as they are on iOS. Wide strokes at low alpha —
+    // which is what these were — are still hard-edged lines, and a hard edge is the one thing a
+    // lit tube does not have: the light it throws has no boundary, which is why it reads as light.
+    blurredPath(path, color.copy(alpha = 0.5f * alpha), width = 5.dp.toPx(), blur = 7.dp.toPx())
+    blurredPath(path, color.copy(alpha = 0.8f * alpha), width = 2.5.dp.toPx(), blur = 2.dp.toPx())
+    // The filament itself stays sharp. Without something crisp at the core the whole thing is a
+    // smudge — the contrast between the hard line and its soft spill is what makes it read as
+    // neon rather than as a glow.
     drawPath(path, color.copy(alpha = 0.95f * alpha), style = Stroke(width = 1.dp.toPx()))
+}
+
+/**
+ * A stroked path with a blur applied to the stroke itself.
+ *
+ * Uses a `BlurMaskFilter` on a native paint rather than `Modifier.blur`, which needs a layer — and
+ * a layer is rasterised at its node's size while everything here is drawn well outside it, so the
+ * blur would arrive with the strands already clipped square. This blurs the stroke where it is
+ * drawn, with no layer involved.
+ *
+ * Below API 28 the mask filter is ignored on a hardware canvas and this degrades to the plain wide
+ * stroke it replaced, which is what the effect looked like everywhere until now.
+ */
+private fun DrawScope.blurredPath(path: Path, color: Color, width: Float, blur: Float) {
+    drawIntoCanvas { canvas ->
+        val paint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = width
+            this.color = color.toArgb()
+            maskFilter = android.graphics.BlurMaskFilter(
+                blur,
+                android.graphics.BlurMaskFilter.Blur.NORMAL,
+            )
+        }
+        canvas.nativeCanvas.drawPath(path.asAndroidPath(), paint)
+    }
 }
 
 /**
