@@ -36,6 +36,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
@@ -165,10 +171,17 @@ private fun AppShellContent(
         Pushed.Settings -> stringResource(R.string.settings)
         Pushed.Profile -> stringResource(R.string.profile)
         Pushed.Analytics -> stringResource(R.string.analytics)
-        // The field itself says what this screen is; a title above it would repeat that.
+        // The field is the title on this screen, so there is nothing else to put here.
         Pushed.Search -> ""
         null -> null
     }
+
+    // Search's field lives in the top bar, in the slot Home's search button occupies — so opening
+    // search is the button staying exactly where it is and becoming typable, and the results below
+    // get the whole screen rather than starting one field-height down.
+    val searchFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(pushed) { if (pushed == Pushed.Search) searchFocus.requestFocus() }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -178,7 +191,26 @@ private fun AppShellContent(
                     // Home puts search in the title slot and its greeting into the scroll — the
                     // two have swapped. Search is wanted from any scroll position, so it is the
                     // one that earns the pinned row; a greeting is not.
-                    if (pushed == null && tab == Tab.HOME) {
+                    if (pushed == Pushed.Search) {
+                        SearchField(
+                            value = query,
+                            placeholder = stringResource(R.string.search_your_music),
+                            modifier = Modifier.padding(end = 4.dp).focusRequester(searchFocus),
+                            trailing = {
+                                if (query.isNotEmpty()) {
+                                    IconButton(onClick = { query = "" }) {
+                                        Icon(
+                                            painterResource(AppIcons.Close),
+                                            contentDescription = stringResource(R.string.close),
+                                        )
+                                    }
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                            onChange = { query = it },
+                        )
+                    } else if (pushed == null && tab == Tab.HOME) {
                         SearchButton(
                             placeholder = stringResource(R.string.search_your_music),
                             modifier = Modifier.padding(end = 4.dp),
@@ -264,7 +296,6 @@ private fun AppShellContent(
                         state = state,
                         viewModel = viewModel,
                         query = query,
-                        onQueryChange = { query = it },
                         onAddToPlaylist = { addingToPlaylist = it },
                     )
 

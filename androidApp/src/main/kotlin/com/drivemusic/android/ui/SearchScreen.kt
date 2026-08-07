@@ -3,28 +3,16 @@ package com.drivemusic.android.ui
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.drivemusic.android.R
 import com.drivemusic.android.player.PlayerViewModel
@@ -35,24 +23,17 @@ import com.drivemusic.shared.model.PlaySource
  * Search, as its own screen rather than as a field wedged above Home's shelves.
  *
  * Searching is a mode, not an ornament: while it is happening the shelves are irrelevant and the
- * results want the whole screen. Home keeps a search *button*, and pressing it comes here with the
- * keyboard already up — one tap to start typing instead of tap-the-field-then-wait.
+ * results want the whole screen. The field itself is the top bar's title, in the slot Home's search
+ * button sits in — so the button does not move when it is pressed, it just becomes typable — and
+ * this screen is nothing but results.
  */
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SearchScreen(
     state: PlayerViewModel.UiState,
     viewModel: PlayerViewModel,
     query: String,
-    onQueryChange: (String) -> Unit,
     onAddToPlaylist: (DriveFile) -> Unit,
 ) {
-    val focusRequester = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
-
-    // Opened *to* search, so the field takes focus immediately.
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
     val normalized = query.trim().lowercase()
     val matches = remember(state.cachedTracks, normalized) {
         if (normalized.isEmpty()) emptyList()
@@ -70,24 +51,6 @@ fun SearchScreen(
     val source = remember { PlaySource("__library__", "", PlaySource.Kind.LIBRARY) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // The same pill Home's search button wears, so arriving here reads as that button
-        // growing a cursor rather than as a different widget replacing it.
-        SearchField(
-            value = query,
-            placeholder = stringResource(R.string.search_your_music),
-            modifier = Modifier.focusRequester(focusRequester),
-            trailing = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = { onQueryChange("") }) {
-                        Icon(painterResource(AppIcons.Close), contentDescription = stringResource(R.string.close))
-                    }
-                }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-            onChange = onQueryChange,
-        )
-
         when {
             normalized.isEmpty() -> Unit
             matches.isEmpty() -> Text(
