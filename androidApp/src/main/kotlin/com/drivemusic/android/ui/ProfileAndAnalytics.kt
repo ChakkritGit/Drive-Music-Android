@@ -269,25 +269,13 @@ private fun <T> ChoiceRow(
                     tint = MaterialTheme.colorScheme.outline,
                 )
             }
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                // Aligned to the value's trailing edge rather than spilling further right.
-                offset = DpOffset(x = 0.dp, y = 4.dp),
-            ) {
+            AppMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { (value, title) ->
-                    DropdownMenuItem(
-                        text = { Text(title) },
+                    AppMenuItem(
+                        label = title,
                         onClick = { onSelect(value); expanded = false },
-                        trailingIcon = {
-                            if (value == selected) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = "Selected",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        },
+                        icon = Icons.Default.Check.takeIf { value == selected },
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }

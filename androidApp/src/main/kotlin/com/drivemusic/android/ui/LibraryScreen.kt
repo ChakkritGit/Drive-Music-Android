@@ -15,10 +15,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueuePlayNext
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -147,11 +149,13 @@ fun SortMenu(current: TrackSort, onSelect: (TrackSort) -> Unit) {
             Icon(Icons.Default.Sort, contentDescription = null)
             Text(current.label, modifier = Modifier.padding(start = 4.dp))
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        AppMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             TrackSort.entries.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label) },
+                AppMenuItem(
+                    label = option.label,
                     onClick = { onSelect(option); expanded = false },
+                    icon = Icons.Default.Check.takeIf { option == current },
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -237,26 +241,19 @@ fun CachedTrackRow(
             IconButton(onClick = { menuOpen = true }) {
                 Icon(Icons.Default.MoreVert, contentDescription = "More")
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 onQueue?.let {
-                    DropdownMenuItem(
-                        text = { Text("Play next") },
-                        leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) },
-                        onClick = { it(); menuOpen = false },
-                    )
+                    AppMenuItem("Play next", { it(); menuOpen = false }, Icons.Default.QueuePlayNext)
                 }
                 onAddToPlaylist?.let {
-                    DropdownMenuItem(
-                        text = { Text("Add to playlist") },
-                        leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) },
-                        onClick = { it(); menuOpen = false },
-                    )
+                    AppMenuItem("Add to playlist", { it(); menuOpen = false }, Icons.Default.PlaylistAdd)
                 }
                 onRemoveDownload?.let {
-                    DropdownMenuItem(
-                        text = { Text("Remove download") },
-                        leadingIcon = { Icon(Icons.Default.Delete, null) },
-                        onClick = { it(); menuOpen = false },
+                    AppMenuItem(
+                        "Remove download",
+                        { it(); menuOpen = false },
+                        Icons.Default.Delete,
+                        tint = MaterialTheme.colorScheme.error,
                     )
                 }
             }

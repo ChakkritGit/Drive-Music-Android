@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueuePlayNext
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -259,17 +261,12 @@ private fun BrowseTrackRow(
             IconButton(onClick = { menuOpen = true }) {
                 Icon(Icons.Default.MoreVert, contentDescription = "More")
             }
-            androidx.compose.material3.DropdownMenu(
-                expanded = menuOpen,
-                onDismissRequest = { menuOpen = false },
-            ) {
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text("Play next") },
-                    onClick = { onQueue(); menuOpen = false },
-                )
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text("Add to playlist") },
-                    onClick = { onAddToPlaylist(); menuOpen = false },
+            AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                AppMenuItem("Play next", { onQueue(); menuOpen = false }, Icons.Default.QueuePlayNext)
+                AppMenuItem(
+                    "Add to playlist",
+                    { onAddToPlaylist(); menuOpen = false },
+                    Icons.Default.PlaylistAdd,
                 )
             }
         }
