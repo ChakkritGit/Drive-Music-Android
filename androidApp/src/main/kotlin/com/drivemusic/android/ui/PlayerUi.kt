@@ -1,5 +1,8 @@
 package com.drivemusic.android.ui
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,6 +21,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -34,6 +45,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -72,6 +84,9 @@ fun CollectionActions(onPlay: () -> Unit, onShuffle: () -> Unit) {
     }
 }
 
+/** The key both the mini player and Now Playing register their artwork under. */
+private const val ARTWORK_KEY = "now-playing-artwork"
+
 /** Decoded once per track rather than per recomposition — a cover is a megabyte of bitmap. */
 @Composable
 private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
@@ -101,8 +116,15 @@ private fun Artwork(bytes: ByteArray?, modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun MiniPlayer(state: PlayerViewModel.UiState, viewModel: PlayerViewModel, onExpand: () -> Unit) {
+fun MiniPlayer(
+    state: PlayerViewModel.UiState,
+    viewModel: PlayerViewModel,
+    sharedScope: SharedTransitionScope,
+    animatedScope: AnimatedVisibilityScope,
+    onExpand: () -> Unit,
+) {
     val track = state.currentTrack ?: return
 
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
@@ -121,7 +143,17 @@ fun MiniPlayer(state: PlayerViewModel.UiState, viewModel: PlayerViewModel, onExp
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Artwork(state.artwork, Modifier.size(48.dp))
+                with(sharedScope) {
+                    Artwork(
+                        state.artwork,
+                        Modifier
+                            .sharedElement(
+                                rememberSharedContentState(ARTWORK_KEY),
+                                animatedVisibilityScope = animatedScope,
+                            )
+                            .size(48.dp),
+                    )
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         state.metadata?.title ?: track.displayName,
@@ -153,10 +185,21 @@ fun MiniPlayer(state: PlayerViewModel.UiState, viewModel: PlayerViewModel, onExp
     }
 }
 
+/**
+ * The full-screen player.
+ *
+ * Laid out like the iOS version: a left-aligned title block with the favourite toggle beside it,
+ * the source underneath, then the slider, then the transport with the play button as a filled
+ * circle. Centring the title, which this did before, put the favourite button somewhere it had to
+ * be hunted for and made the block read as a caption rather than as the thing the screen is about.
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun NowPlayingScreen(
     state: PlayerViewModel.UiState,
     viewModel: PlayerViewModel,
+    sharedScope: SharedTransitionScope,
+    animatedScope: AnimatedVisibilityScope,
     onDismiss: () -> Unit,
 ) {
     val track = state.currentTrack ?: return
@@ -165,52 +208,87 @@ fun NowPlayingScreen(
 
     Column(
         // Full-screen and outside the Scaffold, so it pads itself. `safeDrawing` rather than
-        // `statusBars`: it also covers the gesture bar and any display cutout, which is what the
-        // Up Next list at the bottom of this screen would otherwise run under.
-        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
+        // `statusBars`: it also covers the gesture bar and any display cutout.
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = "Close")
+                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Close")
             }
-            Box(modifier = Modifier.weight(1f)) {
-                state.source?.let {
-                    Text(
-                        "Playing from ${it.name}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                "Now Playing",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.outline,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            // Balances the close button so the title sits centred.
+            Spacer(modifier = Modifier.size(48.dp))
+        }
+
+        with(sharedScope) {
+            Artwork(
+                state.artwork,
+                Modifier
+                    .sharedElement(
+                        rememberSharedContentState(ARTWORK_KEY),
+                        animatedVisibilityScope = animatedScope,
+                    )
+                    .fillMaxWidth(0.82f)
+                    .aspectRatio(1f),
+            )
+        }
+
+        // Left-aligned, with the favourite toggle on the title's own row.
+        Column(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    state.metadata?.title ?: track.displayName,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { viewModel.toggleFavorite(track) }) {
+                    Icon(
+                        if (state.isCurrentFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Favourite",
+                        tint = if (state.isCurrentFavorite) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outline,
                     )
                 }
             }
-            IconButton(onClick = { queueOpen = true }) {
-                Icon(Icons.Default.QueueMusic, contentDescription = "Queue")
+
+            if (state.error != null) {
+                Text(state.error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            } else {
+                Text(
+                    listOfNotNull(state.metadata?.artist, state.metadata?.album).joinToString(" · ")
+                        .ifEmpty { " " },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            state.source?.let {
+                Text(
+                    "Playing from ${it.name}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
 
-        Artwork(state.artwork, Modifier.fillMaxWidth(0.8f).aspectRatio(1f))
-
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                state.metadata?.title ?: track.displayName,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                listOfNotNull(state.metadata?.artist, state.metadata?.album).joinToString(" · ")
-                    .ifEmpty { "Unknown artist" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp)) {
             Slider(
                 value = scrubbing ?: if (state.durationMs > 0) {
                     state.positionMs.toFloat() / state.durationMs
@@ -221,50 +299,28 @@ fun NowPlayingScreen(
                     scrubbing = null
                 },
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(formatDuration(state.positionMs), style = MaterialTheme.typography.labelSmall)
                 Text(formatDuration(state.durationMs), style = MaterialTheme.typography.labelSmall)
             }
         }
 
+        TransportControls(state, viewModel)
+
+        // Utility row: the queue lives here rather than as a header action, matching iOS, and is
+        // disabled when there is nothing after this track to look at.
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp),
+            horizontalArrangement = Arrangement.End,
         ) {
-            IconButton(onClick = viewModel::toggleShuffle) {
+            IconButton(onClick = { queueOpen = true }, enabled = state.upNext.isNotEmpty()) {
                 Icon(
-                    Icons.Default.Shuffle,
-                    contentDescription = "Shuffle",
-                    tint = if (state.queue.shuffle) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.outline,
-                )
-            }
-            IconButton(onClick = viewModel::previous) {
-                Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(36.dp))
-            }
-            IconButton(onClick = viewModel::togglePlayPause) {
-                Icon(
-                    if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (state.isPlaying) "Pause" else "Play",
-                    modifier = Modifier.size(56.dp),
-                )
-            }
-            IconButton(onClick = viewModel::next) {
-                Icon(Icons.Default.SkipNext, contentDescription = "Next", modifier = Modifier.size(36.dp))
-            }
-            IconButton(onClick = viewModel::cycleLoopMode) {
-                Icon(
-                    if (state.queue.loopMode == LoopMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                    contentDescription = "Repeat",
-                    tint = if (state.queue.loopMode == LoopMode.OFF) MaterialTheme.colorScheme.outline
-                    else MaterialTheme.colorScheme.primary,
+                    Icons.AutoMirrored.Filled.List,
+                    contentDescription = "Queue",
+                    tint = MaterialTheme.colorScheme.outline,
                 )
             }
         }
-
     }
 
     if (queueOpen) {
@@ -273,10 +329,74 @@ fun NowPlayingScreen(
 }
 
 /**
- * The queue, as a sheet rather than a list under the transport.
+ * Shuffle, previous, play, next, repeat.
  *
- * Inline it competed with the controls for vertical space, and on a short phone the transport was
- * the thing that lost — a player whose play button can be scrolled away is the wrong trade.
+ * The play button is a filled circle at 72dp and the skip buttons are 52dp, matching iOS —
+ * shuffle and repeat at 44dp are secondary to both, which is the ordering of importance they
+ * actually have. All five clear the 44dp minimum touch target.
+ */
+@Composable
+private fun TransportControls(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = viewModel::toggleShuffle, modifier = Modifier.size(44.dp)) {
+            Icon(
+                Icons.Default.Shuffle,
+                contentDescription = "Shuffle",
+                tint = if (state.queue.shuffle) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outline,
+            )
+        }
+        IconButton(
+            onClick = viewModel::previous,
+            enabled = state.currentTrack != null,
+            modifier = Modifier.size(52.dp),
+        ) {
+            Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(34.dp))
+        }
+
+        Box(
+            modifier = Modifier.size(72.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center,
+        ) {
+            IconButton(
+                onClick = viewModel::togglePlayPause,
+                enabled = state.currentTrack != null && !state.isLoading,
+                modifier = Modifier.size(72.dp),
+            ) {
+                Icon(
+                    if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (state.isPlaying) "Pause" else "Play",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(38.dp),
+                )
+            }
+        }
+
+        IconButton(
+            onClick = viewModel::next,
+            enabled = state.currentTrack != null,
+            modifier = Modifier.size(52.dp),
+        ) {
+            Icon(Icons.Default.SkipNext, contentDescription = "Next", modifier = Modifier.size(34.dp))
+        }
+        IconButton(onClick = viewModel::cycleLoopMode, modifier = Modifier.size(44.dp)) {
+            Icon(
+                if (state.queue.loopMode == LoopMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                contentDescription = "Repeat",
+                tint = if (state.queue.loopMode == LoopMode.OFF) MaterialTheme.colorScheme.outline
+                else MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+/**
+ * The queue: the current track pinned at the top under a "Playing from" header — it is not
+ * *upcoming*, so it is not removable — then the real upcoming order under "Next up".
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -285,35 +405,64 @@ private fun QueueSheet(
     viewModel: PlayerViewModel,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-            Text(
-                "Next up",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            if (state.upNext.isEmpty()) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        LazyColumn(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            item {
                 Text(
-                    "Nothing queued after this track.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(16.dp),
+                    "Queue",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
+            }
+
+            state.currentTrack?.let { current ->
+                item {
+                    Text(
+                        state.source?.let { "Playing from ${it.name}" } ?: "Now playing",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+                item {
+                    TrackRow(
+                        file = current,
+                        isDownloaded = current.id in state.downloadedIds,
+                        isPlaying = true,
+                        onClick = {},
+                        onQueue = null,
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                }
+            }
+
+            if (state.upNext.isEmpty()) {
+                item {
+                    Text(
+                        "Nothing queued after this track.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
             } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
-                    itemsIndexed(state.upNext, key = { _, entry -> entry.index }) { _, entry ->
-                        TrackRow(
-                            file = entry.file,
-                            isDownloaded = entry.file.id in state.downloadedIds,
-                            onClick = { viewModel.jumpTo(entry.index); onDismiss() },
-                            onQueue = { viewModel.removeFromQueue(entry.index) },
-                            queueIcon = Icons.Default.Close,
-                            queueLabel = "Remove from queue",
-                        )
-                    }
+                item {
+                    Text(
+                        "Next up",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                items(state.upNext, key = { it.index }) { entry ->
+                    TrackRow(
+                        file = entry.file,
+                        isDownloaded = entry.file.id in state.downloadedIds,
+                        onClick = { viewModel.jumpTo(entry.index); onDismiss() },
+                        onQueue = { viewModel.removeFromQueue(entry.index) },
+                        queueIcon = Icons.Default.Close,
+                        queueLabel = "Remove from queue",
+                    )
                 }
             }
         }

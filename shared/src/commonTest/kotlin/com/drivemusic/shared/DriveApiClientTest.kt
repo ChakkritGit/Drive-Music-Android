@@ -158,17 +158,17 @@ class DriveApiClientTest {
     }
 
     @Test
-    fun readsTheSignedInEmail() = runTest {
+    fun readsTheSignedInAccount() = runTest {
         val engine = MockEngine {
             respond("""{"email":"someone@example.com","name":"Someone"}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
         }
-        assertEquals("someone@example.com", client(engine).userEmail())
+        assertEquals("someone@example.com", client(engine).userInfo()?.email)
     }
 
     /** The email is a nicety; failing to read it must not take playback down with it. */
     @Test
-    fun aFailedEmailLookupReturnsNullRatherThanThrowing() = runTest {
+    fun aFailedAccountLookupReturnsNullRatherThanThrowing() = runTest {
         val engine = MockEngine { respondError(HttpStatusCode.Unauthorized) }
-        assertEquals(null, client(engine).userEmail())
+        assertEquals(null, client(engine).userInfo())
     }
 }

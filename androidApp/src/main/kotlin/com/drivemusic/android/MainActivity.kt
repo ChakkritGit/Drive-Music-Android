@@ -3,6 +3,7 @@ package com.drivemusic.android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -39,6 +41,11 @@ import com.drivemusic.android.ui.AppShell
 @UnstableApi
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Installed before `super.onCreate`, which is what the API requires: it swaps the
+        // starting window's theme for the app's real one at the first frame, so there is no
+        // moment where the app is drawn with the splash theme still applied.
+        installSplashScreen()
+
         // Explicit rather than inherited from the platform default. From API 35 an app is
         // edge-to-edge whether it asks or not, so the choice is not *whether* content draws behind
         // the system bars but whether the app admits it and pads accordingly. Saying so here keeps
@@ -71,14 +78,23 @@ private fun AppRoot(container: AppContainer) {
     // Attempts silent authorization on launch. Consent, when it is needed, is surfaced as a state
     // rather than launched from here — see `GoogleAuth`, which deliberately holds no Activity.
     LaunchedEffect(Unit) {
-        if (authState is GoogleAuth.State.SignedOut) container.auth.authorize()
+        if (authState is GoogleAuth.State.Checking) container.auth.authorize()
     }
 
     LaunchedEffect(authState) {
         (authState as? GoogleAuth.State.NeedsConsent)?.let { consentLauncher.launch(it.request) }
+        // Read once per authorization rather than on every screen that wants it — the profile is
+        // three strings and does not change while the app runs.
+        if (authState is GoogleAuth.State.Authorized) {
+            val info = container.drive.userInfo()
+            container.auth.setAccount(info?.email, info?.name, info?.picture)
+        }
     }
 
     when (authState) {
+        // Nothing is known yet — a spinner, not the sign-in screen. Showing the latter here is
+        // what made "Sign in with Google" flash on every launch of an already-signed-in app.
+        GoogleAuth.State.Checking -> Centered { CircularProgressIndicator() }
         is GoogleAuth.State.Authorized -> SignedInApp(container)
         is GoogleAuth.State.NeedsConsent -> Centered { Text("Waiting for permission…") }
         is GoogleAuth.State.Failed -> Centered {

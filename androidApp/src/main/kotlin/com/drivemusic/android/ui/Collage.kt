@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -134,4 +135,35 @@ fun SearchField(value: String, placeholder: String, onChange: (String) -> Unit) 
         },
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     )
+}
+
+/**
+ * A titled settings section — the Material 3 answer to a SwiftUI `List` section header.
+ *
+ * Settings screens read as one undifferentiated column of switches without these; the grouping is
+ * what tells you that "Length" belongs to "Crossfade" and not to the thing above it.
+ */
+@Composable
+fun SettingsSection(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 28.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+    )
+}
+
+/** The card a section's rows sit inside, so a group reads as one block. */
+@Composable
+fun SettingsGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    androidx.compose.material3.Surface(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        androidx.compose.foundation.layout.Column(content = content)
+    }
 }

@@ -140,19 +140,23 @@ class DriveApiClient(
         }
     }
 
-    /** The signed-in user's email — the sync room is derived from it. */
-    suspend fun userEmail(): String? {
+/** Who is signed in: enough to show an account row, no more. */
+    suspend fun userInfo(): UserInfo? {
         val token = tokens.freshAccessToken()
         return runCatching {
-            val info: UserInfo = http.get(USERINFO_ENDPOINT) {
+            http.get(USERINFO_ENDPOINT) {
                 header("Authorization", "Bearer $token")
-            }.orThrow().body()
-            info.email
+            }.orThrow().body<UserInfo>()
         }.getOrNull()
     }
 
     @Serializable
-    private data class UserInfo(val email: String? = null, val name: String? = null)
+    data class UserInfo(
+        val email: String? = null,
+        val name: String? = null,
+        /** Avatar URL. Google serves it unauthenticated, so any image loader can fetch it. */
+        val picture: String? = null,
+    )
 
     companion object {
         private const val FILES_ENDPOINT = "https://www.googleapis.com/drive/v3/files"

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -42,7 +43,6 @@ fun CollectionDetailScreen(
     state: PlayerViewModel.UiState,
     viewModel: PlayerViewModel,
     onAddToPlaylist: (DriveFile) -> Unit,
-    onBack: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
 
@@ -56,28 +56,14 @@ fun CollectionDetailScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(collection.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            collection.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(
+            collection.subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+
             if (collection.tracks.isEmpty()) {
                 EmptyState("Nothing here", "This collection has no tracks.")
                 return@Column
@@ -87,16 +73,31 @@ fun CollectionDetailScreen(
                 onPlay = { viewModel.play(collection.tracks, 0, collection.source) },
                 onShuffle = { viewModel.shufflePlay(collection.tracks, collection.source) },
             )
+            val remaining = collection.tracks.count { it.id !in state.downloadedIds }
+            val progress = state.downloadProgress
             Row(modifier = Modifier.padding(horizontal = 16.dp)) {
-                TextButton(onClick = { viewModel.downloadAll(collection.tracks) }) {
-                    Text("Download all")
+                TextButton(
+                    onClick = { viewModel.downloadAll(collection.tracks) },
+                    enabled = progress == null && remaining > 0,
+                ) {
+                    if (progress != null) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Text(
+                            "Downloading ${progress.first} of ${progress.second}",
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    } else {
+                        Text(if (remaining == 0) "All downloaded" else "Download all ($remaining)")
+                    }
                 }
             }
-            state.downloadProgress?.let { (done, total) ->
-                Text(
-                    "Downloading $done of $total",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+            if (progress != null) {
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { progress.first.toFloat() / progress.second },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 )
             }
 
@@ -124,4 +125,3 @@ fun CollectionDetailScreen(
             }
         }
     }
-}

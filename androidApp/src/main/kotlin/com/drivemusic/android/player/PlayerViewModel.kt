@@ -77,6 +77,13 @@ class PlayerViewModel(
         val downloadProgress: Pair<Int, Int>? = null,
     ) {
         val currentTrack: DriveFile? get() = queue.currentTrack
+
+        /** Whether the playing track is in the Favourites playlist. */
+        val isCurrentFavorite: Boolean
+            get() {
+                val id = currentTrack?.id ?: return false
+                return playlists.firstOrNull { it.name == FAVORITES }?.tracks?.any { it.id == id } == true
+            }
         val upNext get() = PlaybackQueue.upNext(queue)
 
         /** Downloaded tracks grouped by artist, for the Home shelves. */
@@ -362,6 +369,26 @@ class PlayerViewModel(
         }
     }
 
+    /**
+     * Adds or removes the track from Favourites, creating the playlist the first time.
+     *
+     * Favourites is an ordinary playlist rather than a flag on the track: it then shows up in the
+     * Playlists tab and on Home for free, and there is one concept of "a set of tracks" rather
+     * than two.
+     */
+    fun toggleFavorite(file: DriveFile) {
+        viewModelScope.launch {
+            val favorites = library.listPlaylists().firstOrNull { it.name == FAVORITES }
+                ?: library.createPlaylist(FAVORITES)
+            if (favorites.tracks.any { it.id == file.id }) {
+                library.removeTrackFromPlaylist(favorites.id, file.id)
+            } else {
+                library.addTrackToPlaylist(favorites.id, file)
+            }
+            refreshLibrary()
+        }
+    }
+
     /** Cover art for one track, by id — never carried on the track itself. */
     suspend fun artworkFor(fileId: String): ByteArray? = library.artwork(fileId)
 
@@ -625,6 +652,10 @@ class PlayerViewModel(
         // Resumed where it left off, but paused — a launch that starts playing on its own is a
         // surprise, and the position is what makes "resume" mean anything.
         loadCurrent(autoplay = false, seekToMs = (session.progress * 1000).toLong())
+    }
+
+    companion object {
+        const val FAVORITES = "Favourites"
     }
 
     override fun onCleared() {

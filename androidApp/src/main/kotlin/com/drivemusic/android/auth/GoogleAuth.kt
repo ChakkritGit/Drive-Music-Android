@@ -32,9 +32,23 @@ import kotlin.coroutines.resumeWithException
  */
 class GoogleAuth(private val context: Context) : AccessTokenProvider {
 
-    data class Account(val email: String?)
+    data class Account(
+        val email: String? = null,
+        val name: String? = null,
+        val pictureUrl: String? = null,
+    )
 
     sealed interface State {
+        /**
+         * Nothing decided yet.
+         *
+         * The distinct starting state matters: with `SignedOut` as the initial value the sign-in
+         * screen rendered for the fraction of a second before silent authorization came back,
+         * which read as being signed out and then abruptly not. "We do not know yet" and "you are
+         * signed out" are different facts and the UI has to be able to tell them apart.
+         */
+        data object Checking : State
+
         data object SignedOut : State
         /** Consent is needed; the caller has to launch [request] and report the result back. */
         data class NeedsConsent(val request: IntentSenderRequest) : State
@@ -42,7 +56,7 @@ class GoogleAuth(private val context: Context) : AccessTokenProvider {
         data class Failed(val message: String) : State
     }
 
-    private val _state = MutableStateFlow<State>(State.SignedOut)
+    private val _state = MutableStateFlow<State>(State.Checking)
     val state: StateFlow<State> = _state.asStateFlow()
 
     @Volatile
@@ -80,7 +94,7 @@ class GoogleAuth(private val context: Context) : AccessTokenProvider {
             else -> {
                 cachedToken = result.accessToken
                 if (result.accessToken == null) State.Failed("Authorized but no access token was returned")
-                else State.Authorized(Account(email = null))
+                else State.Authorized(Account())
             }
         }
         _state.value = state
@@ -94,7 +108,7 @@ class GoogleAuth(private val context: Context) : AccessTokenProvider {
                 .getAuthorizationResultFromIntent(data)
             cachedToken = result.accessToken
             if (result.accessToken == null) State.Failed("Consent completed without an access token")
-            else State.Authorized(Account(email = null))
+            else State.Authorized(Account())
         }.getOrElse { State.Failed(it.message ?: "Consent failed") }
 
         _state.value = state
@@ -106,9 +120,10 @@ class GoogleAuth(private val context: Context) : AccessTokenProvider {
         _state.value = State.SignedOut
     }
 
-    fun setEmail(email: String?) {
-        val current = _state.value
-        if (current is State.Authorized) _state.value = State.Authorized(Account(email))
+    /** Records who is signed in, once the account has been read. */
+    fun setAccount(email: String?, name: String?, pictureUrl: String?) {
+        if (_state.value !is State.Authorized) return
+        _state.value = State.Authorized(Account(email, name, pictureUrl))
     }
 
     /**

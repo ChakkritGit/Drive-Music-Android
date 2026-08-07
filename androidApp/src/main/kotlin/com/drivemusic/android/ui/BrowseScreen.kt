@@ -14,11 +14,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,6 +59,7 @@ fun BrowseScreen(
     onQueue: (DriveFile) -> Unit,
     onAddToPlaylist: (DriveFile) -> Unit,
     onDownloadAll: (List<DriveFile>) -> Unit,
+    downloadProgress: Pair<Int, Int>?,
 ) {
     var stack by remember { mutableStateOf(listOf(Crumb("root", "My Drive"))) }
     var items by remember { mutableStateOf<List<DriveFile>>(emptyList()) }
@@ -101,10 +104,38 @@ fun BrowseScreen(
                 onPlay = { onPlay(audioFiles, 0, source) },
                 onShuffle = { onShuffle(audioFiles, source) },
             )
+            // The button reports what it is doing. Without this, tapping it looked like nothing
+            // happened at all — the work is entirely off screen until a track's "Downloaded"
+            // label appears minutes later.
+            val remaining = audioFiles.count { it.id !in downloadedIds }
             androidx.compose.material3.TextButton(
                 onClick = { onDownloadAll(audioFiles) },
+                enabled = downloadProgress == null && remaining > 0,
                 modifier = Modifier.padding(horizontal = 16.dp),
-            ) { Text("Download all") }
+            ) {
+                if (downloadProgress != null) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Text(
+                        "Downloading ${downloadProgress.first} of ${downloadProgress.second}",
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                } else {
+                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(
+                        if (remaining == 0) "All downloaded" else "Download all ($remaining)",
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+            if (downloadProgress != null) {
+                LinearProgressIndicator(
+                    progress = { downloadProgress.first.toFloat() / downloadProgress.second },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                )
+            }
         }
 
         when {

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The same background the iOS launch screen and app icon sit on, so the two platforms' icons
+      read as the same app rather than as a port. Taken from `LaunchBackground.colorset`.
+    -->
+    <color name="launch_background">#0A0303</color>
+</resources>

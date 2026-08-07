@@ -29,19 +29,14 @@ import com.drivemusic.android.player.PlayerViewModel
 import kotlin.math.roundToInt
 
 @Composable
-fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel, onSignOut: () -> Unit) {
+fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
     var confirmingWipe by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
     ) {
-        Text(
-            "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(16.dp),
-        )
-
-        SectionHeader("Transitions")
+        SettingsSection("Transitions")
+        SettingsGroup {
         SwitchRow(
             title = "Crossfade",
             subtitle = "Blend one track into the next instead of cutting",
@@ -69,9 +64,10 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel, o
             checked = state.gaplessEnabled,
             onChange = viewModel::setGaplessEnabled,
         )
+        }
 
-        HorizontalDivider()
-        SectionHeader("Sound")
+        SettingsSection("Sound")
+        SettingsGroup {
         SwitchRow(
             title = "Volume normalization",
             subtitle = "Even out tracks mastered at different levels",
@@ -94,22 +90,18 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel, o
                 }) { Text("Reset to flat") }
             }
         }
-
-        HorizontalDivider()
-        SectionHeader("Storage")
-        Text(
-            "${state.cachedTracks.size} tracks downloaded · ${formatBytes(state.cacheBytes)}",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-
-        HorizontalDivider()
-        SectionHeader("Account")
-        Row(modifier = Modifier.padding(16.dp)) {
-            TextButton(onClick = onSignOut) { Text("Sign out") }
         }
 
-        SectionHeader("Danger zone")
+        SettingsSection("Storage")
+        SettingsGroup {
+            Text(
+                "${state.cachedTracks.size} tracks downloaded · ${formatBytes(state.cacheBytes)}",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+
+        SettingsSection("Danger zone")
         Row(modifier = Modifier.padding(16.dp)) {
             Button(
                 onClick = { confirmingWipe = true },
