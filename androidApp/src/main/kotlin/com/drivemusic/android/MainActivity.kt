@@ -1,7 +1,7 @@
 package com.drivemusic.android
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,10 +35,20 @@ import androidx.media3.common.util.UnstableApi
 import com.drivemusic.android.auth.GoogleAuth
 import com.drivemusic.android.player.PlayerViewModel
 import androidx.compose.ui.platform.LocalContext
+import com.drivemusic.android.player.AppTheme
+import com.drivemusic.android.player.AppearanceStore
 import com.drivemusic.android.ui.AppShell
+import com.drivemusic.android.ui.DriveMusicTheme
 
 @UnstableApi
-class MainActivity : ComponentActivity() {
+/**
+ * `AppCompatActivity`, not `ComponentActivity`.
+ *
+ * The in-app language override goes through `AppCompatDelegate.setApplicationLocales`, and below
+ * API 33 it is the AppCompat layer that re-applies the stored locale when an activity is created.
+ * On a plain `ComponentActivity` the setting would persist and then do nothing on those devices.
+ */
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Installed before `super.onCreate`, which is what the API requires: it swaps the
         // starting window's theme for the app's real one at the first frame, so there is no
@@ -55,9 +64,13 @@ class MainActivity : ComponentActivity() {
         val container = AppContainer.get(this)
 
         setContent {
-            MaterialTheme {
+            // Read as state so a change on the Profile screen repaints immediately rather than
+            // waiting for a relaunch, which is what the iOS `@AppStorage` binding gives for free.
+            var theme by remember { mutableStateOf(AppearanceStore(this).theme) }
+
+            DriveMusicTheme(theme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppRoot(container)
+                    AppRoot(container) { theme = it }
                 }
             }
         }
@@ -66,7 +79,7 @@ class MainActivity : ComponentActivity() {
 
 @UnstableApi
 @Composable
-private fun AppRoot(container: AppContainer) {
+private fun AppRoot(container: AppContainer, onThemeChange: (AppTheme) -> Unit) {
     val authState by container.auth.state.collectAsState()
 
     val consentLauncher = rememberLauncherForActivityResult(
@@ -95,7 +108,7 @@ private fun AppRoot(container: AppContainer) {
         // Nothing is known yet — a spinner, not the sign-in screen. Showing the latter here is
         // what made "Sign in with Google" flash on every launch of an already-signed-in app.
         GoogleAuth.State.Checking -> Centered { CircularProgressIndicator() }
-        is GoogleAuth.State.Authorized -> SignedInApp(container)
+        is GoogleAuth.State.Authorized -> SignedInApp(container, onThemeChange)
         is GoogleAuth.State.NeedsConsent -> Centered { Text("Waiting for permission…") }
         is GoogleAuth.State.Failed -> Centered {
             Column(
@@ -130,7 +143,7 @@ private fun SignInButton(container: AppContainer) {
 
 @UnstableApi
 @Composable
-private fun SignedInApp(container: AppContainer) {
+private fun SignedInApp(container: AppContainer, onThemeChange: (AppTheme) -> Unit) {
     val application = LocalContext.current.applicationContext as android.app.Application
     val viewModel: PlayerViewModel = viewModel(
         factory = viewModelFactory {
@@ -139,7 +152,12 @@ private fun SignedInApp(container: AppContainer) {
             }
         }
     )
-    AppShell(container, viewModel) { container.auth.signOut() }
+    AppShell(container, viewModel, onThemeChange) {
+        container.auth.signOut()
+        // Cached images were fetched with this account's token and belong to its files — they
+        // must not survive into whoever signs in next.
+        container.clearImageCaches()
+    }
 }
 
 @Composable

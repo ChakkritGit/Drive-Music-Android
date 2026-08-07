@@ -36,6 +36,19 @@ class AppContainer(context: Context) {
         http = driveHttpClient(HttpClient(OkHttp)),
     )
 
+    /**
+     * Drops every cached remote image.
+     *
+     * Called on sign-out: the profile picture and any Drive thumbnails were fetched with the
+     * previous account's token and belong to its files. Downloads are left alone — those are the
+     * user's library, not a cache.
+     */
+    fun clearImageCaches() {
+        val loader = coil.Coil.imageLoader(applicationContext)
+        loader.memoryCache?.clear()
+        loader.diskCache?.clear()
+    }
+
     companion object {
         @Volatile
         private var instance: AppContainer? = null

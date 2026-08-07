@@ -15,7 +15,7 @@
         <item name="postSplashScreenTheme">@style/Theme.DriveMusic</item>
     </style>
 
-    <style name="Theme.DriveMusic" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.DriveMusic" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 </resources>

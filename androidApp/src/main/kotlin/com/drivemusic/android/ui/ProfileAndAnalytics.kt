@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Language
@@ -50,8 +51,20 @@ import com.drivemusic.android.player.AppTheme
 import com.drivemusic.android.player.AppearanceStore
 import com.drivemusic.android.player.PlayerViewModel
 
+/**
+ * Account, preferences, the legal pages, and sign-out.
+ *
+ * Sections and wording follow the iOS `ProfileView` — including what is *not* here. Library
+ * counts and storage live on the analytics and settings screens; repeating them here would make
+ * this a second settings screen rather than an account one.
+ */
 @Composable
-fun ProfileScreen(container: AppContainer, state: PlayerViewModel.UiState, onSignOut: () -> Unit) {
+fun ProfileScreen(
+    container: AppContainer,
+    state: PlayerViewModel.UiState,
+    onThemeChange: (AppTheme) -> Unit,
+    onSignOut: () -> Unit,
+) {
     val context = LocalContext.current
     val appearance = remember { AppearanceStore(context) }
     val authState by container.auth.state.collectAsStateWithLifecycle()
@@ -63,16 +76,16 @@ fun ProfileScreen(container: AppContainer, state: PlayerViewModel.UiState, onSig
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        // Account
-        SettingsGroup {
+        // Account, headerless — the row says what it is.
+        SettingsGroup(modifier = Modifier.padding(top = 8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Avatar(account?.pictureUrl, account?.email, size = 56.dp)
+                Avatar(account?.pictureUrl, size = 56.dp)
                 Column {
                     Text(
                         account?.name ?: "Signed in",
@@ -96,7 +109,12 @@ fun ProfileScreen(container: AppContainer, state: PlayerViewModel.UiState, onSig
                 label = "Appearance",
                 options = AppTheme.entries.map { it to it.title },
                 selected = theme,
-            ) { theme = it; appearance.theme = it }
+            ) {
+                theme = it
+                appearance.theme = it
+                // Repaints now rather than on next launch, matching the iOS `@AppStorage` binding.
+                onThemeChange(it)
+            }
 
             HorizontalDivider()
 
@@ -106,13 +124,6 @@ fun ProfileScreen(container: AppContainer, state: PlayerViewModel.UiState, onSig
                 options = AppLanguage.entries.map { it to it.nativeName },
                 selected = language,
             ) { language = it; appearance.language = it }
-        }
-
-        SettingsSection("Library")
-        SettingsGroup {
-            StatRow("Downloaded tracks", state.cachedTracks.size.toString())
-            StatRow("Playlists", state.playlists.size.toString())
-            StatRow("Storage used", formatBytes(state.cacheBytes))
         }
 
         SettingsSection("About")
@@ -138,7 +149,7 @@ fun ProfileScreen(container: AppContainer, state: PlayerViewModel.UiState, onSig
         }
 
         // Destructive last, which is where a reader expects to find it.
-        SettingsGroup(modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)) {
+        SettingsGroup(modifier = Modifier.padding(top = 12.dp, bottom = 32.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .clickable { confirmingSignOut = true }
@@ -151,7 +162,7 @@ fun ProfileScreen(container: AppContainer, state: PlayerViewModel.UiState, onSig
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
                 )
-                Text("Sign out", color = MaterialTheme.colorScheme.error)
+                Text("Sign Out", color = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -160,10 +171,10 @@ fun ProfileScreen(container: AppContainer, state: PlayerViewModel.UiState, onSig
         AlertDialog(
             onDismissRequest = { confirmingSignOut = false },
             title = { Text("Sign out of Drive Music?") },
-            text = { Text("Downloads stay on this device. You will need to sign in again to browse Drive.") },
+            text = { Text("You'll need to sign in again to access your Drive library.") },
             confirmButton = {
                 TextButton(onClick = { confirmingSignOut = false; onSignOut() }) {
-                    Text("Sign out", color = MaterialTheme.colorScheme.error)
+                    Text("Sign Out", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = { TextButton(onClick = { confirmingSignOut = false }) { Text("Cancel") } },
@@ -192,10 +203,9 @@ private fun openLegalPage(context: android.content.Context, page: LegalPage) {
 }
 
 @Composable
-private fun Avatar(url: String?, email: String?, size: androidx.compose.ui.unit.Dp) {
+private fun Avatar(url: String?, size: androidx.compose.ui.unit.Dp) {
     Box(
-        modifier = Modifier.size(size).clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
+        modifier = Modifier.size(size).clip(CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         if (url != null) {
@@ -206,10 +216,11 @@ private fun Avatar(url: String?, email: String?, size: androidx.compose.ui.unit.
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Text(
-                email?.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            Icon(
+                Icons.Default.AccountCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }

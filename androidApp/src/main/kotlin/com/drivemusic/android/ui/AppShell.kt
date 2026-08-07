@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Insights
@@ -90,7 +91,12 @@ private sealed interface Pushed {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @UnstableApi
 @Composable
-fun AppShell(container: AppContainer, viewModel: PlayerViewModel, onSignOut: () -> Unit) {
+fun AppShell(
+    container: AppContainer,
+    viewModel: PlayerViewModel,
+    onThemeChange: (com.drivemusic.android.player.AppTheme) -> Unit,
+    onSignOut: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showNowPlaying by remember { mutableStateOf(false) }
 
@@ -121,6 +127,7 @@ fun AppShell(container: AppContainer, viewModel: PlayerViewModel, onSignOut: () 
                     sharedScope = this@SharedTransitionLayout,
                     animatedScope = this@AnimatedContent,
                     onExpand = { showNowPlaying = true },
+                    onThemeChange = onThemeChange,
                     onSignOut = onSignOut,
                 )
             }
@@ -138,6 +145,7 @@ private fun AppShellContent(
     sharedScope: SharedTransitionScope,
     animatedScope: AnimatedVisibilityScope,
     onExpand: () -> Unit,
+    onThemeChange: (com.drivemusic.android.player.AppTheme) -> Unit,
     onSignOut: () -> Unit,
 ) {
 
@@ -235,7 +243,7 @@ private fun AppShellContent(
                     )
 
                     Pushed.Settings -> SettingsScreen(state, viewModel)
-                    Pushed.Profile -> ProfileScreen(container, state, onSignOut)
+                    Pushed.Profile -> ProfileScreen(container, state, onThemeChange, onSignOut)
                     Pushed.Analytics -> AnalyticsScreen(state)
 
                     null -> Column(modifier = Modifier.fillMaxSize()) {
@@ -292,13 +300,9 @@ private fun ProfileAvatar(container: AppContainer) {
     val authState by container.auth.state.collectAsStateWithLifecycle()
     val account = (authState as? com.drivemusic.android.auth.GoogleAuth.State.Authorized)?.account
 
-    Box(
-        modifier = Modifier.size(30.dp).clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
-        contentAlignment = Alignment.Center,
-    ) {
-        // The picture, when there is one. The initial was standing in for it permanently because
-        // this never rendered the URL at all, only the fallback.
+    Box(modifier = Modifier.size(30.dp).clip(CircleShape), contentAlignment = Alignment.Center) {
+        // The picture, when there is one. This used to render only the fallback, so the initial
+        // stood in for the photo permanently.
         if (account?.pictureUrl != null) {
             AsyncImage(
                 model = account.pictureUrl,
@@ -307,10 +311,11 @@ private fun ProfileAvatar(container: AppContainer) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Text(
-                account?.email?.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            Icon(
+                Icons.Default.AccountCircle,
+                contentDescription = "Profile",
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
