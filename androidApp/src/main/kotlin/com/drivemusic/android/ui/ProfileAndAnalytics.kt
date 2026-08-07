@@ -18,6 +18,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Language
@@ -41,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivemusic.android.AppContainer
@@ -116,7 +120,7 @@ fun ProfileScreen(
                 onThemeChange(it)
             }
 
-            HorizontalDivider()
+            SettingsDivider()
 
             ChoiceRow(
                 icon = Icons.Default.Language,
@@ -129,7 +133,7 @@ fun ProfileScreen(
         SettingsSection("About")
         SettingsGroup {
             LegalPage.entries.forEachIndexed { index, page ->
-                if (index > 0) HorizontalDivider()
+                if (index > 0) SettingsDivider()
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .clickable { openLegalPage(context, page) }
@@ -226,7 +230,14 @@ private fun Avatar(url: String?, size: androidx.compose.ui.unit.Dp) {
     }
 }
 
-/** A row that opens a menu of choices — the Compose equivalent of a SwiftUI `Picker`. */
+/**
+ * A row that expands a Material 3 menu of choices — the equivalent of a SwiftUI `Picker` row.
+ *
+ * The menu is anchored to the *value*, not to the row, so it expands out of the thing being
+ * changed rather than appearing over on the left across the label. The current choice carries a
+ * check, since a menu that shows options without marking the active one makes you remember what
+ * you were looking at a moment ago.
+ */
 @Composable
 private fun <T> ChoiceRow(
     icon: ImageVector,
@@ -237,25 +248,48 @@ private fun <T> ChoiceRow(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Box {
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable { expanded = true }.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
-            Text(label, modifier = Modifier.weight(1f))
-            Text(
-                options.firstOrNull { it.first == selected }?.second.orEmpty(),
-                color = MaterialTheme.colorScheme.outline,
-            )
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { (value, title) ->
-                DropdownMenuItem(
-                    text = { Text(title) },
-                    onClick = { onSelect(value); expanded = false },
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { expanded = true }.padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+        Text(label, modifier = Modifier.weight(1f))
+
+        Box {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    options.firstOrNull { it.first == selected }?.second.orEmpty(),
+                    color = MaterialTheme.colorScheme.outline,
                 )
+                Icon(
+                    // Rotates to point up while open, so the control says which way it will go.
+                    if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outline,
+                )
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                // Aligned to the value's trailing edge rather than spilling further right.
+                offset = DpOffset(x = 0.dp, y = 4.dp),
+            ) {
+                options.forEach { (value, title) ->
+                    DropdownMenuItem(
+                        text = { Text(title) },
+                        onClick = { onSelect(value); expanded = false },
+                        trailingIcon = {
+                            if (value == selected) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        },
+                    )
+                }
             }
         }
     }

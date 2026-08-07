@@ -58,6 +58,7 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
                 onChange = viewModel::setAutoMixEnabled,
             )
         }
+        SettingsDivider(startInset = 16.dp)
         SwitchRow(
             title = "Gapless",
             subtitle = "Start the next track the instant this one ends",
@@ -74,6 +75,7 @@ fun SettingsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
             checked = state.volumeNormalizationEnabled,
             onChange = viewModel::setVolumeNormalizationEnabled,
         )
+        SettingsDivider(startInset = 16.dp)
         SwitchRow(
             title = "Equalizer",
             subtitle = "Bass, mid and treble tone controls",

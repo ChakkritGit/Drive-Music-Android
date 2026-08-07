@@ -167,3 +167,19 @@ fun SettingsGroup(
         androidx.compose.foundation.layout.Column(content = content)
     }
 }
+
+/**
+ * The rule between rows in a settings group.
+ *
+ * Inset on both sides rather than edge to edge: starting it under the icon cuts the row's own
+ * leading column in half, and running it into the card's corner radius makes the card look like it
+ * has been sliced. [startInset] defaults to where text sits in a row that has an icon — 16dp of
+ * padding, a 24dp icon, 16dp of spacing.
+ */
+@Composable
+fun SettingsDivider(startInset: Dp = 56.dp) {
+    androidx.compose.material3.HorizontalDivider(
+        modifier = Modifier.padding(start = startInset, end = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant,
+    )
+}

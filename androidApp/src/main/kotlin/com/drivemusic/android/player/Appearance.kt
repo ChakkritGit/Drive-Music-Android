@@ -37,14 +37,17 @@ class AppearanceStore(context: Context) {
         get() = runCatching {
             AppTheme.valueOf(preferences.getString(AppTheme.STORAGE_KEY, null) ?: "SYSTEM")
         }.getOrDefault(AppTheme.SYSTEM)
-        set(value) = preferences.edit().putString(AppTheme.STORAGE_KEY, value.name).apply()
+        // `commit`, not `apply`. These change rarely and on a deliberate user action, so the
+        // synchronous write costs nothing worth measuring — and an `apply` still in flight when
+        // the process goes away loses the choice, which reads as the setting not sticking.
+        set(value) { preferences.edit().putString(AppTheme.STORAGE_KEY, value.name).commit() }
 
     var language: AppLanguage
         get() = runCatching {
             AppLanguage.valueOf(preferences.getString(AppLanguage.STORAGE_KEY, null) ?: "SYSTEM")
         }.getOrDefault(AppLanguage.SYSTEM)
         set(value) {
-            preferences.edit().putString(AppLanguage.STORAGE_KEY, value.name).apply()
+            preferences.edit().putString(AppLanguage.STORAGE_KEY, value.name).commit()
             apply(value)
         }
 
