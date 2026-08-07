@@ -64,22 +64,23 @@ fun CollectionDetailScreen(
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         if (collection.tracks.isNotEmpty()) {
+            // Narrowest to broadest, top to bottom: the field that changes what the list below
+            // contains, then what state those files are in, then the buttons that act on the
+            // whole thing. Play and Shuffle sat directly under the title before, which put the
+            // most destructive-to-your-current-playback control under the returning thumb.
+            //
+            // Each is a separate statement, so each gets space; packed flush they read as one
+            // block of clutter above the tracks rather than as three things you might each want.
+            item {
+                SearchBar(query, stringResource(R.string.search_this_collection)) { query = it }
+            }
+            item { DownloadAllRow(remaining, progress) { viewModel.downloadAll(collection.tracks) } }
             item {
                 CollectionActions(
                     onPlay = { viewModel.play(collection.tracks, 0, collection.source) },
                     onShuffle = { viewModel.shufflePlay(collection.tracks, collection.source) },
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
-            }
-            item { DownloadAllRow(remaining, progress) { viewModel.downloadAll(collection.tracks) } }
-            // The header is three separate statements — what you can do with this collection,
-            // what state its files are in, and how to narrow it — and with no space between them
-            // they read as one block of clutter above the tracks.
-            item {
-                SearchBar(
-                    query,
-                    stringResource(R.string.search_this_collection),
-                    modifier = Modifier.padding(bottom = 12.dp),
-                ) { query = it }
             }
         }
 

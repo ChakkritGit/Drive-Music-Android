@@ -56,9 +56,13 @@ import com.drivemusic.android.player.PlayerViewModel
 import com.drivemusic.shared.model.LoopMode
 
 @Composable
-fun CollectionActions(onPlay: () -> Unit, onShuffle: () -> Unit) {
+fun CollectionActions(
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Button(onClick = onPlay) {
