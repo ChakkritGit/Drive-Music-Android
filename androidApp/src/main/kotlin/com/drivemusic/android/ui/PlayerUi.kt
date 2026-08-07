@@ -440,7 +440,7 @@ fun NowPlayingScreen(
         // Set apart from the slider above it. The slider reports where the track is; these change
         // what is playing. Flush together they read as one block of controls, and the play button
         // is the one thing on this screen that should be unmissable.
-        TransportControls(state, viewModel, modifier = Modifier.padding(top = 16.dp))
+        TransportControls(state, viewModel, modifier = Modifier.padding(top = 26.dp))
 
         // Utility row: what is happening on one side, what you can do on the other — matching
         // iOS. The queue lives here rather than as a header action, and is disabled when there is
