@@ -3,6 +3,7 @@ package com.drivemusic.android.ui
 import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -125,7 +126,13 @@ fun MarqueeText(
                 color = color,
                 maxLines = 1,
                 softWrap = false,
-                modifier = Modifier.graphicsLayer { translationX = -overflow * progress },
+                // Laid out at its own full width, ignoring the container's constraints — SwiftUI
+                // spells this `.fixedSize()`. Without it the text is measured against the
+                // container and simply ends there, so scrolling left revealed blank space where
+                // the tail should have been: the last part of the title was never laid out.
+                modifier = Modifier
+                    .requiredWidth(with(density) { textWidth.toDp() })
+                    .graphicsLayer { translationX = -overflow * progress },
             )
         } else {
             Text(text, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
