@@ -409,120 +409,100 @@ fun AnalyticsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) 
 }
 
 /**
- * The model as a diagram: feature groups on the left, hidden units in the middle, one output.
+ * The model as a diagram: one node per input dimension, the hidden layer, one output.
  *
- * Groups rather than the raw inputs. There are dozens of input dimensions and drawing one node
- * each would be a wall of dots that says nothing; the groups are the units a reader can name, and
- * an edge's weight is the mean across the group it stands for.
+ * Every input, not one node per feature group. Grouping was my own shortcut and it misrepresented
+ * the model — it drew a 6→12→1 network when the thing being described is 47→12→1, and the
+ * Architecture tile directly above says so. A diagram that disagrees with the number next to it is
+ * worse than no diagram.
  *
- * Edges are coloured by sign and faded by magnitude, so what shows is which connections the model
- * actually leans on. Every network drawn with uniform edges looks identical whatever it learned.
+ * Edges carry the weight's sign as colour and its magnitude as opacity, so what shows is which
+ * connections the model actually leans on; drawn uniformly, every network looks identical whatever
+ * it learned.
  *
- * A pulse runs along the edges each time the model trains — the animation exists to mark that
- * something happened, so it runs on a training step and is otherwise still. A diagram that moves
- * constantly is a diagram whose movement means nothing.
+ * A pulse runs the edges on a training step and is otherwise still. The animation exists to mark
+ * that something happened, and movement that never stops marks nothing.
  */
 @Composable
 private fun NetworkDiagram(w1: List<List<Double>>, w2: List<Double>, trainingEvents: Int) {
     val accent = MaterialTheme.colorScheme.primary
     val negative = MaterialTheme.colorScheme.error
-    val idle = MaterialTheme.colorScheme.surfaceVariant
+    val idle = MaterialTheme.colorScheme.outline
 
-    // Restarts whenever the model trains, and settles when it finishes — see the note above.
     val pulse = remember { Animatable(1f) }
     LaunchedEffect(trainingEvents) {
         pulse.snapTo(0f)
         pulse.animateTo(1f, tween(1400))
     }
 
-    val groupWeights = remember(w1) { groupEdgeWeights(w1) }
-    val maxGroup = groupWeights.flatten().maxOfOrNull { kotlin.math.abs(it) }?.takeIf { it > 0 } ?: 1.0
+    // `w1` is hidden-major: w1[hidden][input].
+    val inputCount = w1.firstOrNull()?.size ?: 0
+    val hiddenCount = w1.size
+    val maxIn = w1.flatten().maxOfOrNull { kotlin.math.abs(it) }?.takeIf { it > 0 } ?: 1.0
     val maxOut = w2.maxOfOrNull { kotlin.math.abs(it) }?.takeIf { it > 0 } ?: 1.0
 
-    Canvas(modifier = Modifier.fillMaxWidth().height(200.dp)) {
-        val inputCount = groupWeights.size
-        val hiddenCount = w2.size
-        val inputX = 20.dp.toPx()
+    Canvas(modifier = Modifier.fillMaxWidth().height(NETWORK_HEIGHT)) {
+        val inputX = 16.dp.toPx()
         val hiddenX = size.width / 2
-        val outputX = size.width - 20.dp.toPx()
+        val outputX = size.width - 16.dp.toPx()
 
-        fun y(index: Int, count: Int) =
-            if (count <= 1) size.height / 2
-            else size.height * (index + 0.5f) / count
+        // Evenly spaced with a gap at each end, as iOS lays it out: height / (count + 1).
+        fun y(index: Int, count: Int) = size.height * (index + 1f) / (count + 1f)
 
-        for (input in 0 until inputCount) {
-            for (hidden in 0 until hiddenCount) {
-                val weight = groupWeights[input].getOrNull(hidden) ?: 0.0
-                val strength = (kotlin.math.abs(weight) / maxGroup).toFloat()
+        for (hidden in 0 until hiddenCount) {
+            for (input in 0 until inputCount) {
+                val weight = w1[hidden][input]
+                val strength = (kotlin.math.abs(weight) / maxIn).toFloat()
                 drawLine(
-                    color = (if (weight >= 0) accent else negative).copy(alpha = 0.08f + strength * 0.5f),
+                    color = (if (weight >= 0) accent else negative).copy(alpha = 0.04f + strength * 0.35f),
                     start = Offset(inputX, y(input, inputCount)),
                     end = Offset(hiddenX, y(hidden, hiddenCount)),
-                    strokeWidth = 1.dp.toPx(),
+                    strokeWidth = 0.7.dp.toPx(),
                 )
             }
         }
         for (hidden in 0 until hiddenCount) {
-            val weight = w2[hidden]
-            val strength = (kotlin.math.abs(weight) / maxOut).toFloat()
+            val strength = (kotlin.math.abs(w2[hidden]) / maxOut).toFloat()
             drawLine(
-                color = (if (weight >= 0) accent else negative).copy(alpha = 0.08f + strength * 0.5f),
+                color = (if (w2[hidden] >= 0) accent else negative).copy(alpha = 0.1f + strength * 0.6f),
                 start = Offset(hiddenX, y(hidden, hiddenCount)),
                 end = Offset(outputX, size.height / 2),
                 strokeWidth = 1.dp.toPx(),
             )
         }
 
-        // The pulse: a dot travelling each edge, left to right, once per training step.
         if (pulse.value < 1f) {
             val progress = pulse.value
+            val fade = (1f - progress) * 0.8f
+            // One dot per input, travelling to the nearest hidden unit rather than one per edge:
+            // 564 dots at once is a smear, not a pulse.
             for (input in 0 until inputCount) {
-                for (hidden in 0 until hiddenCount) {
-                    val from = Offset(inputX, y(input, inputCount))
-                    val to = Offset(hiddenX, y(hidden, hiddenCount))
-                    drawCircle(
-                        color = accent.copy(alpha = (1f - progress) * 0.7f),
-                        radius = 2.dp.toPx(),
-                        center = Offset(
-                            from.x + (to.x - from.x) * progress,
-                            from.y + (to.y - from.y) * progress,
-                        ),
-                    )
-                }
+                val hidden = input * hiddenCount / inputCount.coerceAtLeast(1)
+                val from = Offset(inputX, y(input, inputCount))
+                val to = Offset(hiddenX, y(hidden.coerceIn(0, hiddenCount - 1), hiddenCount))
+                drawCircle(
+                    color = accent.copy(alpha = fade),
+                    radius = 1.5.dp.toPx(),
+                    center = Offset(
+                        from.x + (to.x - from.x) * progress,
+                        from.y + (to.y - from.y) * progress,
+                    ),
+                )
             }
         }
 
         for (input in 0 until inputCount) {
-            drawCircle(idle, radius = 5.dp.toPx(), center = Offset(inputX, y(input, inputCount)))
+            drawCircle(idle, radius = 1.5.dp.toPx(), center = Offset(inputX, y(input, inputCount)))
         }
         for (hidden in 0 until hiddenCount) {
-            drawCircle(idle, radius = 4.dp.toPx(), center = Offset(hiddenX, y(hidden, hiddenCount)))
+            drawCircle(idle, radius = 3.dp.toPx(), center = Offset(hiddenX, y(hidden, hiddenCount)))
         }
-        drawCircle(accent, radius = 6.dp.toPx(), center = Offset(outputX, size.height / 2))
+        drawCircle(accent, radius = 5.dp.toPx(), center = Offset(outputX, size.height / 2))
     }
 }
 
-/**
- * Mean weight from each feature *group* to each hidden unit.
- *
- * `w1` is indexed hidden-major, so this transposes as it reduces: one row per group, one column
- * per hidden unit.
- */
-private fun groupEdgeWeights(w1: List<List<Double>>): List<List<Double>> {
-    var offset = 0
-    return Features.groups.map { group ->
-        val row = w1.map { hidden ->
-            var total = 0.0
-            var count = 0
-            for (index in offset until offset + group.size) {
-                hidden.getOrNull(index)?.let { total += it; count++ }
-            }
-            if (count == 0) 0.0 else total / count
-        }
-        offset += group.size
-        row
-    }
-}
+/** Tall enough that 47 input nodes are separate dots rather than a line. */
+private val NETWORK_HEIGHT = 280.dp
 
 /**
  * The training log: what the model predicted, against what actually happened.
