@@ -67,4 +67,7 @@
     <string name="average_weight_by_feature_group">ขนาดน้ำหนักเฉลี่ยแยกตามกลุ่มคุณลักษณะ</string>
     <string name="analyzing_progress">กำลังวิเคราะห์ %1$d จาก %2$d</string>
     <string name="model_not_trained_yet">ยังไม่ได้เรียนรู้อะไร ลองเล่นเพลงสักสองสามเพลงก่อน</string>
+    <string name="predicted">ทำนาย</string>
+    <string name="actual">จริง</string>
+    <string name="network_activity_detail">กลุ่มคุณลักษณะอยู่ซ้าย หน่วยซ่อนอยู่กลาง และผลลัพธ์หนึ่งค่าอยู่ขวา สีของเส้นคือเครื่องหมายของน้ำหนัก ความเข้มคือระดับที่โมเดลพึ่งพาการเชื่อมต่อนั้น</string>
 </resources>

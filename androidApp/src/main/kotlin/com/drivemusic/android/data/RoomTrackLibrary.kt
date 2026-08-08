@@ -10,6 +10,7 @@ import com.drivemusic.shared.model.Playlist
 import com.drivemusic.shared.model.RecentSource
 import com.drivemusic.shared.model.TrackAnalysis
 import com.drivemusic.shared.recommendation.ListeningModel
+import com.drivemusic.shared.recommendation.ModelEvent
 import com.drivemusic.shared.recommendation.RecommendationModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -94,6 +95,23 @@ class RoomTrackLibrary(
 
     override suspend fun deleteStaleAnalyses(version: Int) = io {
         dao.deleteStaleAnalyses(version)
+    }
+
+    override suspend fun listModelEvents(limit: Int): List<ModelEvent> = io {
+        dao.recentModelEvents(limit).mapNotNull { row ->
+            runCatching { json.decodeFromString(ModelEvent.serializer(), row.json) }.getOrNull()
+        }
+    }
+
+    override suspend fun recordModelEvent(event: ModelEvent) = io {
+        dao.putModelEvent(
+            ModelEventEntity(
+                id = event.id,
+                json = json.encodeToString(ModelEvent.serializer(), event),
+                atMillis = event.at.toEpochMilliseconds(),
+            )
+        )
+        dao.trimModelEvents(MAX_MODEL_EVENTS)
     }
 
     override suspend fun listPlaylists(): List<Playlist> = io {
@@ -208,6 +226,9 @@ class RoomTrackLibrary(
     }
 
     private companion object {
+        /** Enough for the analytics list to page through; older steps are of no interest. */
+        const val MAX_MODEL_EVENTS = 200
+
         const val KEY_SESSION = "session"
         const val KEY_MODEL = "model"
         const val KEY_RECENTS = "recent-sources"

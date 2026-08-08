@@ -23,6 +23,7 @@ import com.drivemusic.shared.model.PlaybackSession
 import com.drivemusic.shared.playback.PlaybackQueue
 import com.drivemusic.shared.playback.PlaybackQueueState
 import com.drivemusic.shared.recommendation.Features
+import com.drivemusic.shared.recommendation.ModelEvent
 import com.drivemusic.shared.recommendation.RecommendationModel
 import com.drivemusic.android.audio.TrackAnalysisRunner
 import com.drivemusic.shared.analysis.TrackAnalyzer
@@ -97,6 +98,17 @@ class PlayerViewModel(
         val featureWeights: List<Pair<String, Double>> = emptyList(),
         /** When the model last learned something. */
         val modelUpdatedAt: kotlinx.datetime.Instant? = null,
+        /** Layer sizes, as `inputs → hidden → 1`. */
+        val modelArchitecture: String = "",
+        /** Euclidean norm of every weight in both layers — how much the model has grown overall. */
+        val modelWeightNorm: Double = 0.0,
+        val modelMinWeight: Double = 0.0,
+        val modelMaxWeight: Double = 0.0,
+        /** Recent training steps, newest first. */
+        val modelEvents: List<ModelEvent> = emptyList(),
+        /** Both layers' weights, for the network diagram. */
+        val modelW1: List<List<Double>> = emptyList(),
+        val modelW2: List<Double> = emptyList(),
     ) {
         val currentTrack: DriveFile? get() = queue.currentTrack
 
@@ -205,6 +217,7 @@ class PlayerViewModel(
             // exists precisely because a stored BPM from an older detector is worse than none —
             // it looks authoritative and shapes every mix out of that track.
             library.deleteStaleAnalyses(TrackAnalyzer.VERSION)
+            _state.update { it.copy(modelEvents = library.listModelEvents()) }
             refreshLibrary()
             restoreSession()
             analyzeBacklog()
@@ -605,8 +618,19 @@ class PlayerViewModel(
             offset += group.size
             group.label to if (count == 0) 0.0 else total / count
         }
+        val flat = model.w1.flatten() + model.w2
         _state.update {
-            it.copy(featureWeights = weights, modelUpdatedAt = model.updatedAt)
+            it.copy(
+                featureWeights = weights,
+                modelUpdatedAt = model.updatedAt,
+                modelArchitecture =
+                    "${Features.FEATURE_SIZE} → ${RecommendationModel.HIDDEN_SIZE} → 1",
+                modelWeightNorm = kotlin.math.sqrt(flat.sumOf { it * it }),
+                modelMinWeight = flat.minOrNull() ?: 0.0,
+                modelMaxWeight = flat.maxOrNull() ?: 0.0,
+                modelW1 = model.w1,
+                modelW2 = model.w2,
+            )
         }
     }
 
@@ -662,6 +686,8 @@ class PlayerViewModel(
         // jump, or a new queue. Left in place it would fire at the end of the *new* track and play
         // whatever was next before the change.
         cancelGaplessArm()
+        // What actually happened to the track being left behind, before anything overwrites it.
+        trainOnOutgoing()
         val file = _state.value.currentTrack ?: return
         loadJob?.cancel()
         transitionArmedFor = null
@@ -950,14 +976,58 @@ class PlayerViewModel(
     private fun currentWeights(): List<Double> = weightsFor(_state.value.queue.tracks)
 
     /** Teaches the model how much of a track was actually played. */
+    /**
+     * Trains on how much of the track being replaced actually played.
+     *
+     * Without this the model only ever saw `1.0` — training happened solely when a track ran to
+     * its end, so every label it had said "this was played all the way through" and it could not
+     * learn anything from the strongest signal a listener gives: skipping. A track abandoned after
+     * five seconds now teaches that, with the fraction it earned.
+     *
+     * The position is read from the player rather than from state, because state is about to be
+     * replaced and a value mid-update would be the wrong track's.
+     */
+    private fun trainOnOutgoing() {
+        val file = _state.value.currentTrack ?: return
+        val player = engine.player(engine.activeSlot)
+        val duration = player.duration
+        if (duration <= 0) return
+        val fraction = (player.currentPosition.toDouble() / duration).coerceIn(0.0, 1.0)
+        // Nothing to learn from a track that was never really started — loading one and moving on
+        // is not a judgement about it.
+        if (fraction < MINIMUM_TRAINABLE_FRACTION) return
+        trainOn(file, fraction)
+    }
+
     private fun trainOn(file: DriveFile, fraction: Double) {
         viewModelScope.launch {
-            val features = Features.extract(file, _state.value.metadata, Clock.System.now())
-            model = RecommendationModel.trainStep(model, features, fraction.coerceIn(0.0, 1.0))
+            val now = Clock.System.now()
+            val features = Features.extract(file, _state.value.metadata, now)
+            val target = fraction.coerceIn(0.0, 1.0)
+            // Recorded *before* the step, which is the whole point of the number: what the model
+            // thought was going to happen while it still did not know the answer. Read after
+            // training it would only tell you how well it remembers what it was just told.
+            val predicted = RecommendationModel.predict(model, features)
+            model = RecommendationModel.trainStep(model, features, target)
             library.saveModel(model)
+            library.recordModelEvent(
+                ModelEvent(
+                    id = "${file.id}-${now.toEpochMilliseconds()}",
+                    trackId = file.id,
+                    title = _state.value.metadata?.title?.takeIf { it.isNotBlank() } ?: file.displayName,
+                    fraction = target,
+                    predicted = predicted,
+                    at = now,
+                )
+            )
             // Home re-ranks "Made For You" off this, and says "Learning your taste…" until the
             // count clears the threshold.
-            _state.update { it.copy(trainingEvents = model.trainingEvents) }
+            _state.update {
+                it.copy(
+                    trainingEvents = model.trainingEvents,
+                    modelEvents = library.listModelEvents(),
+                )
+            }
             publishModelSummary()
         }
     }
@@ -1007,6 +1077,12 @@ class PlayerViewModel(
          * made while listening is unlikely to land inside the window and arm the wrong track.
          */
         const val GAPLESS_ARM_LEAD_MS = 10_000L
+
+        /**
+         * Below this the track barely played, and treating that as a verdict would punish tracks
+         * for being passed over on the way somewhere else.
+         */
+        const val MINIMUM_TRAINABLE_FRACTION = 0.02
     }
 
     override fun onCleared() {

@@ -67,4 +67,7 @@
     <string name="average_weight_by_feature_group">特徴グループごとの平均重み。</string>
     <string name="analyzing_progress">%1$d / %2$d を解析中</string>
     <string name="model_not_trained_yet">まだ学習していません。まず数曲再生してください。</string>
+    <string name="predicted">予測</string>
+    <string name="actual">実際</string>
+    <string name="network_activity_detail">左が特徴グループ、中央が隠れユニット、右が出力です。線の色は重みの符号を、濃さはモデルがその接続をどれだけ重視しているかを表します。</string>
 </resources>

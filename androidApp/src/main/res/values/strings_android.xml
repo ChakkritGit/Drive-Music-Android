@@ -67,4 +67,7 @@
     <string name="average_weight_by_feature_group">Average weight magnitude by feature group.</string>
     <string name="analyzing_progress">Analyzing %1$d of %2$d</string>
     <string name="model_not_trained_yet">Nothing learned yet — play a few tracks first.</string>
+    <string name="predicted">Predicted</string>
+    <string name="actual">Actual</string>
+    <string name="network_activity_detail">Feature groups on the left, hidden units in the middle, one output. Line colour is the weight’s sign; its strength is how much the model leans on that connection.</string>
 </resources>

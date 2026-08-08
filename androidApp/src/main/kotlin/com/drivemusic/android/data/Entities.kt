@@ -68,6 +68,22 @@ data class TrackAnalysisEntity(
     val version: Int,
 )
 
+/**
+ * One training step, kept so the analytics screen can show what the model predicted against what
+ * actually happened.
+ *
+ * Its own table rather than a field on the model: the model is one row rewritten on every step,
+ * and these are the history of those steps — folding them together would mean rewriting the whole
+ * history to record one event.
+ */
+@Entity(tableName = "model_events")
+data class ModelEventEntity(
+    @PrimaryKey val id: String,
+    val json: String,
+    /** Denormalised so the list can be ordered without parsing every row. */
+    val atMillis: Long,
+)
+
 @Entity(tableName = "playlists")
 data class PlaylistEntity(
     @PrimaryKey val id: String,
@@ -132,6 +148,23 @@ interface LibraryDao {
     suspend fun putSingleton(value: SingletonEntity)
 
     @Query("DELETE FROM cached_tracks") suspend fun clearTracks()
+    @Query("SELECT * FROM model_events ORDER BY atMillis DESC LIMIT :limit")
+    suspend fun recentModelEvents(limit: Int): List<ModelEventEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putModelEvent(event: ModelEventEntity)
+
+    /**
+     * Keeps the newest [limit] and drops the rest.
+     *
+     * A training history that only grows is a table that only grows, and nothing reads past the
+     * first page or two of it.
+     */
+    @Query("DELETE FROM model_events WHERE id NOT IN (SELECT id FROM model_events ORDER BY atMillis DESC LIMIT :limit)")
+    suspend fun trimModelEvents(limit: Int)
+
+    @Query("DELETE FROM model_events") suspend fun clearModelEvents()
+
     @Query("SELECT * FROM track_analysis")
     suspend fun allAnalyses(): List<TrackAnalysisEntity>
 
@@ -155,8 +188,9 @@ interface LibraryDao {
         PlaylistEntity::class,
         SingletonEntity::class,
         TrackAnalysisEntity::class,
+        ModelEventEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -171,6 +205,18 @@ abstract class LibraryDatabase : RoomDatabase() {
          * could be thrown away safely, but destroying the database to add a table would take the
          * user's playlists and their whole downloaded library index with it.
          */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `model_events` (" +
+                        "`id` TEXT NOT NULL, " +
+                        "`json` TEXT NOT NULL, " +
+                        "`atMillis` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`id`))"
+                )
+            }
+        }
+
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL(

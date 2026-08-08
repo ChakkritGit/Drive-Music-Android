@@ -44,6 +44,10 @@ interface TrackLibrary {
     /** Drops analyses produced by an older analyser, so they are recomputed rather than believed. */
     suspend fun deleteStaleAnalyses(version: Int)
 
+    /** The most recent training steps, newest first. */
+    suspend fun listModelEvents(limit: Int = 50): List<com.drivemusic.shared.recommendation.ModelEvent>
+    suspend fun recordModelEvent(event: com.drivemusic.shared.recommendation.ModelEvent)
+
     suspend fun listPlaylists(): List<Playlist>
     suspend fun createPlaylist(name: String): Playlist
     suspend fun deletePlaylist(id: String)

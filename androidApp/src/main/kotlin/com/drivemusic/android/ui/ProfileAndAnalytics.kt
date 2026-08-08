@@ -47,6 +47,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.ui.text.style.TextOverflow
 import com.drivemusic.shared.model.TrackAnalysis
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.style.TextAlign
+import com.drivemusic.shared.recommendation.Features
+import com.drivemusic.shared.recommendation.ModelEvent
+import kotlin.math.roundToInt
 import com.drivemusic.android.R
 import com.drivemusic.android.AppContainer
 import com.drivemusic.android.auth.GoogleAuth
@@ -371,12 +380,241 @@ fun AnalyticsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) 
             if (state.trainingEvents == 0 || state.featureWeights.isEmpty()) {
                 Note(stringResource(R.string.model_not_trained_yet))
             } else {
+                StatGrid(
+                    listOf(
+                        stringResource(R.string.architecture) to state.modelArchitecture,
+                        stringResource(R.string.weight_norm) to "%.3f".format(state.modelWeightNorm),
+                        stringResource(R.string.min_weight) to "%.3f".format(state.modelMinWeight),
+                        stringResource(R.string.max_weight) to "%.3f".format(state.modelMaxWeight),
+                    )
+                )
                 WeightBars(state.featureWeights)
                 Note(stringResource(R.string.average_weight_by_feature_group))
             }
         }
+
+        AnalyticsSection(stringResource(R.string.network_activity)) {
+            if (state.modelW1.isEmpty()) {
+                Note(stringResource(R.string.model_not_trained_yet))
+            } else {
+                NetworkDiagram(state.modelW1, state.modelW2, state.trainingEvents)
+                Note(stringResource(R.string.network_activity_detail))
+            }
+        }
+
+        AnalyticsSection(stringResource(R.string.recent_training_events)) {
+            TrainingEvents(state.modelEvents)
+        }
     }
 }
+
+/**
+ * The model as a diagram: feature groups on the left, hidden units in the middle, one output.
+ *
+ * Groups rather than the raw inputs. There are dozens of input dimensions and drawing one node
+ * each would be a wall of dots that says nothing; the groups are the units a reader can name, and
+ * an edge's weight is the mean across the group it stands for.
+ *
+ * Edges are coloured by sign and faded by magnitude, so what shows is which connections the model
+ * actually leans on. Every network drawn with uniform edges looks identical whatever it learned.
+ *
+ * A pulse runs along the edges each time the model trains — the animation exists to mark that
+ * something happened, so it runs on a training step and is otherwise still. A diagram that moves
+ * constantly is a diagram whose movement means nothing.
+ */
+@Composable
+private fun NetworkDiagram(w1: List<List<Double>>, w2: List<Double>, trainingEvents: Int) {
+    val accent = MaterialTheme.colorScheme.primary
+    val negative = MaterialTheme.colorScheme.error
+    val idle = MaterialTheme.colorScheme.surfaceVariant
+
+    // Restarts whenever the model trains, and settles when it finishes — see the note above.
+    val pulse = remember { Animatable(1f) }
+    LaunchedEffect(trainingEvents) {
+        pulse.snapTo(0f)
+        pulse.animateTo(1f, tween(1400))
+    }
+
+    val groupWeights = remember(w1) { groupEdgeWeights(w1) }
+    val maxGroup = groupWeights.flatten().maxOfOrNull { kotlin.math.abs(it) }?.takeIf { it > 0 } ?: 1.0
+    val maxOut = w2.maxOfOrNull { kotlin.math.abs(it) }?.takeIf { it > 0 } ?: 1.0
+
+    Canvas(modifier = Modifier.fillMaxWidth().height(200.dp)) {
+        val inputCount = groupWeights.size
+        val hiddenCount = w2.size
+        val inputX = 20.dp.toPx()
+        val hiddenX = size.width / 2
+        val outputX = size.width - 20.dp.toPx()
+
+        fun y(index: Int, count: Int) =
+            if (count <= 1) size.height / 2
+            else size.height * (index + 0.5f) / count
+
+        for (input in 0 until inputCount) {
+            for (hidden in 0 until hiddenCount) {
+                val weight = groupWeights[input].getOrNull(hidden) ?: 0.0
+                val strength = (kotlin.math.abs(weight) / maxGroup).toFloat()
+                drawLine(
+                    color = (if (weight >= 0) accent else negative).copy(alpha = 0.08f + strength * 0.5f),
+                    start = Offset(inputX, y(input, inputCount)),
+                    end = Offset(hiddenX, y(hidden, hiddenCount)),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+        }
+        for (hidden in 0 until hiddenCount) {
+            val weight = w2[hidden]
+            val strength = (kotlin.math.abs(weight) / maxOut).toFloat()
+            drawLine(
+                color = (if (weight >= 0) accent else negative).copy(alpha = 0.08f + strength * 0.5f),
+                start = Offset(hiddenX, y(hidden, hiddenCount)),
+                end = Offset(outputX, size.height / 2),
+                strokeWidth = 1.dp.toPx(),
+            )
+        }
+
+        // The pulse: a dot travelling each edge, left to right, once per training step.
+        if (pulse.value < 1f) {
+            val progress = pulse.value
+            for (input in 0 until inputCount) {
+                for (hidden in 0 until hiddenCount) {
+                    val from = Offset(inputX, y(input, inputCount))
+                    val to = Offset(hiddenX, y(hidden, hiddenCount))
+                    drawCircle(
+                        color = accent.copy(alpha = (1f - progress) * 0.7f),
+                        radius = 2.dp.toPx(),
+                        center = Offset(
+                            from.x + (to.x - from.x) * progress,
+                            from.y + (to.y - from.y) * progress,
+                        ),
+                    )
+                }
+            }
+        }
+
+        for (input in 0 until inputCount) {
+            drawCircle(idle, radius = 5.dp.toPx(), center = Offset(inputX, y(input, inputCount)))
+        }
+        for (hidden in 0 until hiddenCount) {
+            drawCircle(idle, radius = 4.dp.toPx(), center = Offset(hiddenX, y(hidden, hiddenCount)))
+        }
+        drawCircle(accent, radius = 6.dp.toPx(), center = Offset(outputX, size.height / 2))
+    }
+}
+
+/**
+ * Mean weight from each feature *group* to each hidden unit.
+ *
+ * `w1` is indexed hidden-major, so this transposes as it reduces: one row per group, one column
+ * per hidden unit.
+ */
+private fun groupEdgeWeights(w1: List<List<Double>>): List<List<Double>> {
+    var offset = 0
+    return Features.groups.map { group ->
+        val row = w1.map { hidden ->
+            var total = 0.0
+            var count = 0
+            for (index in offset until offset + group.size) {
+                hidden.getOrNull(index)?.let { total += it; count++ }
+            }
+            if (count == 0) 0.0 else total / count
+        }
+        offset += group.size
+        row
+    }
+}
+
+/**
+ * The training log: what the model predicted, against what actually happened.
+ *
+ * Paged rather than scrolled, because this sits inside a screen that already scrolls — a list that
+ * scrolls within a scroll is a list you cannot reliably reach the bottom of.
+ */
+@Composable
+private fun TrainingEvents(events: List<ModelEvent>) {
+    if (events.isEmpty()) {
+        Note(stringResource(R.string.no_training_events_yet_play_a_few_tracks_first))
+        return
+    }
+
+    var page by remember { mutableStateOf(0) }
+    val pageCount = ((events.size + EVENTS_PER_PAGE - 1) / EVENTS_PER_PAGE).coerceAtLeast(1)
+    val current = page.coerceIn(0, pageCount - 1)
+    val shown = events.drop(current * EVENTS_PER_PAGE).take(EVENTS_PER_PAGE)
+
+    Column {
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                stringResource(R.string.predicted),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.width(64.dp),
+                textAlign = TextAlign.End,
+            )
+            Text(
+                stringResource(R.string.actual),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.width(64.dp),
+                textAlign = TextAlign.End,
+            )
+        }
+        shown.forEach { event ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    event.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                // Rounded, not truncated: 0.567 is 57%, and truncating would put this list one
+                // point below every other place the same number is shown.
+                Percent((event.predicted * 100).roundToInt())
+                Percent((event.fraction * 100).roundToInt())
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        }
+
+        if (pageCount > 1) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { page = current - 1 }, enabled = current > 0) {
+                    Text(stringResource(R.string.prev))
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.page_lld_of_lld, current + 1, pageCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(onClick = { page = current + 1 }, enabled = current < pageCount - 1) {
+                    Text(stringResource(R.string.next))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Percent(value: Int) {
+    Text(
+        "$value%",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.outline,
+        textAlign = TextAlign.End,
+        modifier = Modifier.width(64.dp),
+    )
+}
+
+private const val EVENTS_PER_PAGE = 8
 
 /** Two-column tiles. */
 @Composable
