@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -81,15 +82,45 @@ class GoogleAuth(private val context: Context) : AccessTokenProvider {
      * and calls [onConsentResult]. Splitting it this way keeps every Activity dependency at the
      * call site: this class needs no Activity, so it can live for the whole process.
      */
-    suspend fun authorize(): State {
-        val result = runCatching { requestAuthorization() }
-            .getOrElse { return State.Failed(it.message ?: "Authorization failed").also { s -> _state.value = s } }
+    /**
+     * Asks for Drive authorization.
+     *
+     * [interactive] is what separates "check whether we already have access" from "the user just
+     * asked to sign in". A first launch always comes back needing consent, and launching that
+     * consent screen unprompted put Google's account chooser in front of the user before the app
+     * had said what it wanted access *for* — the sign-in screen that explains it was never seen.
+     * Silently, that same answer simply means signed out.
+     */
+    suspend fun authorize(interactive: Boolean = false): State {
+        // The silent probe is bounded; the user's own sign-in is not.
+        //
+        // On the launch path Play Services can take a long time to answer — or, mid-update, not
+        // answer at all — and an app whose first screen is an unbounded spinner is one that can
+        // simply never start. Timing out there means signed out, which the button recovers from.
+        //
+        // Applying the same bound to an interactive request was wrong: it abandoned a sign-in the
+        // user had just asked for and returned them to the same screen with nothing said, which
+        // reads as the button not working.
+        val attempt = if (interactive) {
+            runCatching { requestAuthorization() }
+        } else {
+            withTimeoutOrNull(AUTHORIZE_TIMEOUT_MS) { runCatching { requestAuthorization() } }
+                ?: return State.SignedOut.also { _state.value = it }
+        }
+        val result = attempt.getOrElse {
+            return State.Failed(it.message ?: "Authorization failed").also { s -> _state.value = s }
+        }
 
         val state = when {
             result.hasResolution() -> {
                 val pendingIntent = result.pendingIntent
-                if (pendingIntent == null) State.Failed("Consent required but no intent was provided")
-                else State.NeedsConsent(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
+                when {
+                    pendingIntent == null -> State.Failed("Consent required but no intent was provided")
+                    !interactive -> State.SignedOut
+                    else -> State.NeedsConsent(
+                        IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+                    )
+                }
             }
             else -> {
                 cachedToken = result.accessToken
@@ -156,6 +187,9 @@ class GoogleAuth(private val context: Context) : AccessTokenProvider {
         }
 
     private companion object {
+        /** Long enough for a cold Play Services, short enough not to read as a hang. */
+        const val AUTHORIZE_TIMEOUT_MS = 15_000L
+
         const val DRIVE_READONLY = "https://www.googleapis.com/auth/drive.readonly"
         const val USERINFO_EMAIL = "https://www.googleapis.com/auth/userinfo.email"
     }

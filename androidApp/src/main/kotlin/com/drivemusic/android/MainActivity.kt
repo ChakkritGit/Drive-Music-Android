@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.drivemusic.android.player.AppTheme
 import com.drivemusic.android.player.AppearanceStore
 import com.drivemusic.android.ui.AppShell
+import com.drivemusic.android.ui.SignInScreen
 import com.drivemusic.android.ui.DriveMusicTheme
 
 @UnstableApi
@@ -120,25 +121,22 @@ private fun AppRoot(container: AppContainer, onThemeChange: (AppTheme) -> Unit) 
                 Button(onClick = { container.auth.signOut() }) { Text(stringResource(R.string.try_again)) }
             }
         }
-        GoogleAuth.State.SignedOut -> Centered {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(stringResource(R.string.drive_music), style = MaterialTheme.typography.headlineMedium)
-                Text(stringResource(R.string.sign_in_prompt))
-                SignInButton(container)
+        GoogleAuth.State.SignedOut -> {
+            var busy by remember { mutableStateOf(false) }
+            LaunchedEffect(busy) {
+                if (busy) {
+                    container.auth.authorize(interactive = true)
+                    busy = false
+                }
             }
+            SignInScreen(
+                isSigningIn = busy,
+                // A failure surfaces as `State.Failed` and its own screen; this slot exists for a
+                // sign-in that comes back here having gone nowhere.
+                errorMessage = null,
+                onSignIn = { busy = true },
+            )
         }
-    }
-}
-
-@Composable
-private fun SignInButton(container: AppContainer) {
-    var busy by remember { mutableStateOf(false) }
-    LaunchedEffect(busy) { if (busy) { container.auth.authorize(); busy = false } }
-    Button(onClick = { busy = true }, enabled = !busy) {
-        Text(stringResource(if (busy) R.string.connecting else R.string.connect_google_drive))
     }
 }
 
