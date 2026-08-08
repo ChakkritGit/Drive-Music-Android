@@ -337,7 +337,7 @@ private fun AppShellContent(
                     Pushed.PlaybackSettings -> PlaybackSettingsScreen(state, viewModel)
                     Pushed.DataSettings -> DataSettingsScreen(state, viewModel)
                     Pushed.Profile -> ProfileScreen(container, state, onThemeChange, onSignOut)
-                    Pushed.Analytics -> AnalyticsScreen(state)
+                    Pushed.Analytics -> AnalyticsScreen(state, viewModel)
                     Pushed.Search -> SearchScreen(
                         state = state,
                         viewModel = viewModel,

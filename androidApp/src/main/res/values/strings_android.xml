@@ -62,4 +62,9 @@
     <string name="delete_playlist_confirm">Delete “%1$s”? The playlist is removed. The tracks themselves stay downloaded.</string>
     <string name="beatmatching_detail">Nudges the incoming track’s speed so the two share a beat through the mix.</string>
     <string name="analyze_tracks_detail">Reads tempo, key and where each track is worth mixing in and out. Runs once per track, in the background.</string>
+    <string name="_15_18_khz">15–18 kHz</string>
+    <string name="no_tracks_analyzed_yet">No tracks analyzed yet. Turn on “Analyze tracks automatically” in Settings.</string>
+    <string name="average_weight_by_feature_group">Average weight magnitude by feature group.</string>
+    <string name="analyzing_progress">Analyzing %1$d of %2$d</string>
+    <string name="model_not_trained_yet">Nothing learned yet — play a few tracks first.</string>
 </resources>

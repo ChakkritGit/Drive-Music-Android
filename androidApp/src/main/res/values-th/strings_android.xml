@@ -62,4 +62,9 @@
     <string name="delete_playlist_confirm">ลบ “%1$s” ไหม เพลย์ลิสต์จะถูกลบ แต่เพลงที่ดาวน์โหลดไว้ยังอยู่</string>
     <string name="beatmatching_detail">ปรับความเร็วเพลงที่กำลังเข้ามาเล็กน้อย ให้ทั้งสองเพลงลงจังหวะเดียวกันตลอดช่วงมิกซ์</string>
     <string name="analyze_tracks_detail">อ่านจังหวะ คีย์ และจุดที่ควรมิกซ์เข้าออกของแต่ละเพลง ทำครั้งเดียวต่อเพลง เบื้องหลัง</string>
+    <string name="_15_18_khz">15–18 kHz</string>
+    <string name="no_tracks_analyzed_yet">ยังไม่มีเพลงที่วิเคราะห์แล้ว เปิด “วิเคราะห์เพลงอัตโนมัติ” ในหน้าตั้งค่า</string>
+    <string name="average_weight_by_feature_group">ขนาดน้ำหนักเฉลี่ยแยกตามกลุ่มคุณลักษณะ</string>
+    <string name="analyzing_progress">กำลังวิเคราะห์ %1$d จาก %2$d</string>
+    <string name="model_not_trained_yet">ยังไม่ได้เรียนรู้อะไร ลองเล่นเพลงสักสองสามเพลงก่อน</string>
 </resources>

@@ -62,4 +62,9 @@
     <string name="delete_playlist_confirm">「%1$s」を削除しますか？プレイリストは削除されますが、曲のダウンロードは残ります。</string>
     <string name="beatmatching_detail">次の曲の速度をわずかに調整し、ミックス中も拍が揃うようにします。</string>
     <string name="analyze_tracks_detail">テンポ、キー、ミックスの出入りに適した位置を解析します。曲ごとに一度、バックグラウンドで実行されます。</string>
+    <string name="_15_18_khz">15〜18 kHz</string>
+    <string name="no_tracks_analyzed_yet">解析済みの曲はまだありません。設定で「曲を自動的に解析」をオンにしてください。</string>
+    <string name="average_weight_by_feature_group">特徴グループごとの平均重み。</string>
+    <string name="analyzing_progress">%1$d / %2$d を解析中</string>
+    <string name="model_not_trained_yet">まだ学習していません。まず数曲再生してください。</string>
 </resources>

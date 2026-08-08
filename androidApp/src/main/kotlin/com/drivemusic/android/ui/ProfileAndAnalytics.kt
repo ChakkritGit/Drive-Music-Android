@@ -38,6 +38,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.text.style.TextOverflow
+import com.drivemusic.shared.model.TrackAnalysis
 import com.drivemusic.android.R
 import com.drivemusic.android.AppContainer
 import com.drivemusic.android.auth.GoogleAuth
@@ -285,30 +294,183 @@ private fun <T> ChoiceRow(
  * of it is the summary rather than the picture.
  */
 @Composable
-fun AnalyticsScreen(state: PlayerViewModel.UiState) {
+fun AnalyticsScreen(state: PlayerViewModel.UiState, viewModel: PlayerViewModel) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(R.string.library), style = MaterialTheme.typography.titleMedium)
-        StatRow(stringResource(R.string.downloaded_tracks), state.cachedTracks.size.toString())
-        StatRow(stringResource(R.string.artists), state.artists.size.toString())
-        StatRow(stringResource(R.string.playlists), state.playlists.size.toString())
-        StatRow(stringResource(R.string.recently_played_sources), state.recentSources.size.toString())
-        StatRow(stringResource(R.string.storage_used), formatBytes(state.cacheBytes))
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-        Text(stringResource(R.string.most_played_sources), style = MaterialTheme.typography.titleMedium)
-        if (state.recentSources.isEmpty()) {
-            Text(
-                stringResource(R.string.nothing_played_yet),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
+        // Tiles rather than label/value rows, as on iOS. These are five unrelated counts, and a
+        // column of rows invites reading them as a list where the order means something.
+        StatGrid(
+            listOf(
+                stringResource(R.string.cached_tracks) to state.cachedTracks.size.toString(),
+                stringResource(R.string.cache_size) to formatBytes(state.cacheBytes),
+                stringResource(R.string.playlists) to
+                    "${state.playlists.size} (${state.playlists.sumOf { it.tracks.size }})",
+                stringResource(R.string.recently_played) to state.recentSources.size.toString(),
+                stringResource(R.string.training_events) to state.trainingEvents.toString(),
             )
-        } else {
-            state.recentSources.sortedByDescending { it.playCount }.forEach { recent ->
-                StatRow(recent.source.name, "${recent.playCount}×")
+        )
+
+        AnalyticsSection(stringResource(R.string.audio_quality)) {
+            val analysed = state.analyses.values
+            if (analysed.isEmpty()) {
+                Note(stringResource(R.string.no_tracks_analyzed_yet))
+            } else {
+                // Counts every analysis, not only those with a measurable cutoff. Filtering here
+                // is what would hide the best files: they are the ones whose spectrum has no wall
+                // to find, so they get their own tile rather than vanishing.
+                val unmeasured = analysed.count { it.qualityTier == TrackAnalysis.QualityTier.UNKNOWN }
+                StatGrid(
+                    buildList {
+                        add(stringResource(R.string.analyzed) to analysed.size.toString())
+                        add(
+                            stringResource(R.string.below_15_khz) to
+                                analysed.count { it.qualityTier == TrackAnalysis.QualityTier.LOW }.toString()
+                        )
+                        add(
+                            stringResource(R.string._15_18_khz) to
+                                analysed.count { it.qualityTier == TrackAnalysis.QualityTier.MEDIUM }.toString()
+                        )
+                        add(
+                            stringResource(R.string.above_18_khz) to
+                                analysed.count { it.qualityTier == TrackAnalysis.QualityTier.HIGH }.toString()
+                        )
+                        if (unmeasured > 0) {
+                            add(stringResource(R.string.unmeasured) to unmeasured.toString())
+                        }
+                    }
+                )
+                Note(stringResource(R.string.where_each_track_s_spectrum_stops_a_wall_well_below_20_khz_i))
+            }
+
+            // A one-off job, not a preference — which is why it lives next to the numbers it
+            // fills in rather than in Settings.
+            val remaining = state.cachedTracks.count { state.analyses[it.fileId] == null }
+            if (remaining > 0) {
+                TextButton(onClick = { viewModel.analyzeAll() }) {
+                    Text(stringResource(R.string.analyze_all_downloaded_tracks))
+                }
+            }
+        }
+
+        AnalyticsSection(stringResource(R.string.recently_played)) {
+            if (state.recentSources.isEmpty()) {
+                Note(stringResource(R.string.nothing_played_yet))
+            } else {
+                state.recentSources.sortedByDescending { it.playCount }.forEach { recent ->
+                    StatRow(
+                        recent.source.name.ifBlank { stringResource(R.string.library) },
+                        "${recent.playCount}×",
+                    )
+                }
+            }
+        }
+
+        AnalyticsSection(stringResource(R.string.model_details)) {
+            if (state.trainingEvents == 0 || state.featureWeights.isEmpty()) {
+                Note(stringResource(R.string.model_not_trained_yet))
+            } else {
+                WeightBars(state.featureWeights)
+                Note(stringResource(R.string.average_weight_by_feature_group))
+            }
+        }
+    }
+}
+
+/** Two-column tiles. */
+@Composable
+private fun StatGrid(items: List<Pair<String, String>>) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (label, value) ->
+                    StatTile(label, value, modifier = Modifier.weight(1f))
+                }
+                // Keeps a lone tile on the last row at half width rather than letting it stretch
+                // across and read as a different kind of thing.
+                if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                value,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 2,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnalyticsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        content()
+    }
+}
+
+@Composable
+private fun Note(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.outline,
+    )
+}
+
+/**
+ * Weight magnitude per feature group, as bars.
+ *
+ * Scaled against the largest group rather than against an absolute, because the numbers themselves
+ * mean nothing to a reader — what is legible is which groups the model leans on relative to the
+ * others, and that is a comparison the bars make directly.
+ */
+@Composable
+private fun WeightBars(weights: List<Pair<String, Double>>) {
+    val maximum = weights.maxOfOrNull { it.second }?.takeIf { it > 0 } ?: 1.0
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        weights.forEach { (label, magnitude) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.width(96.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth((magnitude / maximum).toFloat().coerceIn(0f, 1f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                }
             }
         }
     }

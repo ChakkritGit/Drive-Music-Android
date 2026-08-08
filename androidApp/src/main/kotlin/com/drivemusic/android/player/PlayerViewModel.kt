@@ -89,6 +89,14 @@ class PlayerViewModel(
         val downloadProgress: Pair<Int, Int>? = null,
         /** How many times the model has been trained — Home says so until it has enough. */
         val trainingEvents: Int = 0,
+        /**
+         * Average weight magnitude per feature group — what the recommender has actually learned
+         * to care about. Summarised into state rather than exposing the model, so the analytics
+         * screen reads numbers instead of reaching into the learner.
+         */
+        val featureWeights: List<Pair<String, Double>> = emptyList(),
+        /** When the model last learned something. */
+        val modelUpdatedAt: kotlinx.datetime.Instant? = null,
     ) {
         val currentTrack: DriveFile? get() = queue.currentTrack
 
@@ -192,6 +200,7 @@ class PlayerViewModel(
         viewModelScope.launch {
             model = library.loadModel()
             _state.update { it.copy(trainingEvents = model.trainingEvents) }
+            publishModelSummary()
             // Anything the previous analyser produced is dropped rather than trusted: the version
             // exists precisely because a stored BPM from an older detector is worse than none —
             // it looks authoritative and shapes every mix out of that track.
@@ -441,6 +450,21 @@ class PlayerViewModel(
      * It is the same single-file-at-a-time queue as everything else, so it costs one core in the
      * background and finishes whenever it finishes.
      */
+    /**
+     * Analyses everything downloaded that has not been analysed yet.
+     *
+     * Public because it is offered as a one-off action next to the numbers it fills in, and it
+     * runs regardless of the automatic setting — asking for it *is* the request.
+     */
+    fun analyzeAll() {
+        viewModelScope.launch {
+            val analysed = _state.value.analyses
+            library.listCachedTracks()
+                .filter { analysed[it.fileId]?.version != TrackAnalyzer.VERSION }
+                .forEach { enqueueAnalysis(it) }
+        }
+    }
+
     private suspend fun analyzeBacklog() {
         val analysed = _state.value.analyses
         library.listCachedTracks()
@@ -450,6 +474,11 @@ class PlayerViewModel(
 
     private fun analyzeInBackground(track: CachedTrack) {
         if (!_state.value.autoAnalyzeEnabled) return
+        enqueueAnalysis(track)
+    }
+
+    /** Queues [track] for analysis whatever the automatic setting says. */
+    private fun enqueueAnalysis(track: CachedTrack) {
         val existing = _state.value.analyses[track.fileId]
         if (existing != null && existing.version == TrackAnalyzer.VERSION) return
         if (analysisJob?.isActive == true) {
@@ -557,6 +586,29 @@ class PlayerViewModel(
      */
     /** Whether the model has seen enough plays for its ranking to mean anything. */
     val isModelTrained: Boolean get() = model.trainingEvents >= TRAINED_THRESHOLD
+
+    /**
+     * Summarises the model's first-layer weights by feature group.
+     *
+     * Mean of the absolute value, not the sum: the groups have very different sizes — one bias
+     * against dozens of artist buckets — and a sum would rank them by how many dimensions they
+     * happen to occupy rather than by how much the model leans on them.
+     */
+    private fun publishModelSummary() {
+        var offset = 0
+        val weights = Features.groups.map { group ->
+            var total = 0.0
+            var count = 0
+            for (index in offset until offset + group.size) {
+                model.w1.getOrNull(index)?.forEach { total += kotlin.math.abs(it); count++ }
+            }
+            offset += group.size
+            group.label to if (count == 0) 0.0 else total / count
+        }
+        _state.update {
+            it.copy(featureWeights = weights, modelUpdatedAt = model.updatedAt)
+        }
+    }
 
     fun toggleFavorite(file: DriveFile) {
         viewModelScope.launch {
@@ -906,6 +958,7 @@ class PlayerViewModel(
             // Home re-ranks "Made For You" off this, and says "Learning your taste…" until the
             // count clears the threshold.
             _state.update { it.copy(trainingEvents = model.trainingEvents) }
+            publishModelSummary()
         }
     }
 

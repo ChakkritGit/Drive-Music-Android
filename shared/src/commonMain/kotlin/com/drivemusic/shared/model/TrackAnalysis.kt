@@ -31,6 +31,38 @@ data class TrackAnalysis(
     val waveform: List<Float> = emptyList(),
     val version: Int,
 ) {
+    /**
+     * How the spectral cutoff reads as a quality tier.
+     *
+     * The thresholds are where common encoders put their low-pass, so a track landing on one is
+     * strong evidence of that setting — but this describes *the spectrum*, not the file's actual
+     * bitrate, and a genuinely dark recording with no high end reads low however it was encoded.
+     */
+    val qualityTier: QualityTier
+        get() = when {
+            spectralCutoffHz == null -> QualityTier.UNKNOWN
+            spectralCutoffHz < 15_000 -> QualityTier.LOW
+            spectralCutoffHz < 18_000 -> QualityTier.MEDIUM
+            else -> QualityTier.HIGH
+        }
+
+    enum class QualityTier {
+        /** Cut below ~15kHz — typically 128kbps or lower, or an old, very lossy source. */
+        LOW,
+
+        /** ~15–18kHz — roughly 192–256kbps territory. */
+        MEDIUM,
+
+        /** Above ~18kHz — 320kbps or lossless; nothing meaningful is missing. */
+        HIGH,
+
+        /**
+         * No cutoff was found. Not "unknown quality" — the best files are exactly the ones whose
+         * spectrum has no wall to find, so this is its own answer rather than a gap.
+         */
+        UNKNOWN,
+    }
+
     /** Seconds between beats, or null without a tempo. */
     val beatInterval: Double?
         get() = bpm?.takeIf { it > 0 }?.let { 60.0 / it }
